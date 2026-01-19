@@ -1,23 +1,35 @@
 import * as THREE from "three";
 import { ATLAS_SIZE } from "./textureConfig";
 
-// Texture names that map to files in src/textures/
-export const TEXTURE_NAMES = [
-  "grass",       // 0 - grass top
-  "grass_side",  // 1 - grass side
-  "dirt",        // 2 - dirt
-  "stone",       // 3 - stone
-  "sand",        // 4 - sand
-  "snow",        // 5 - snow top
-  "snow_side",   // 6 - snow side
-  "coal_ore",    // 7 - coal ore
-  "iron_ore",    // 8 - iron ore
-  "tree_side",   // 9 - tree side
-  "tree_top",    // 10 - tree top
-  "leaves",      // 11 - leaves
-] as const;
+// Import textures using Vite's asset handling
+import grassPath from "../textures/grass.png";
+import grassSidePath from "../textures/grass_side.png";
+import dirtPath from "../textures/dirt.png";
+import stonePath from "../textures/stone.png";
+import sandPath from "../textures/sand.png";
+import snowPath from "../textures/snow.png";
+import snowSidePath from "../textures/snow_side.png";
+import coalOrePath from "../textures/coal_ore.png";
+import ironOrePath from "../textures/iron_ore.png";
+import treeSidePath from "../textures/tree_side.png";
+import treeTopPath from "../textures/tree_top.png";
+import leavesPath from "../textures/leaves.png";
 
-export type TextureName = (typeof TEXTURE_NAMES)[number];
+// Texture paths in order
+const TEXTURE_PATHS = [
+  grassPath,       // 0 - grass top
+  grassSidePath,   // 1 - grass side
+  dirtPath,        // 2 - dirt
+  stonePath,       // 3 - stone
+  sandPath,        // 4 - sand
+  snowPath,        // 5 - snow top
+  snowSidePath,    // 6 - snow side
+  coalOrePath,     // 7 - coal ore
+  ironOrePath,     // 8 - iron ore
+  treeSidePath,    // 9 - tree side
+  treeTopPath,     // 10 - tree top
+  leavesPath,      // 11 - leaves
+] as const;
 
 const TILE_SIZE = 16; // Each texture is 16x16 pixels
 
@@ -26,7 +38,7 @@ export class TextureAtlas {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private loadedCount = 0;
-  private totalTextures = TEXTURE_NAMES.length;
+  private totalTextures = TEXTURE_PATHS.length;
   private onReady: (() => void) | null = null;
 
   constructor() {
@@ -48,7 +60,7 @@ export class TextureAtlas {
   }
 
   private loadAllTextures() {
-    TEXTURE_NAMES.forEach((name, index) => {
+    TEXTURE_PATHS.forEach((path, index) => {
       const img = new Image();
       img.onload = () => {
         const x = (index % ATLAS_SIZE) * TILE_SIZE;
@@ -62,14 +74,14 @@ export class TextureAtlas {
         }
       };
       img.onerror = () => {
-        console.warn(`Failed to load texture: ${name}`);
+        console.warn(`Failed to load texture: ${path}`);
         this.loadedCount++;
         if (this.loadedCount === this.totalTextures) {
           this.texture.needsUpdate = true;
           if (this.onReady) this.onReady();
         }
       };
-      img.src = `/src/textures/${name}.png`;
+      img.src = path;
     });
   }
 
