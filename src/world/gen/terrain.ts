@@ -23,9 +23,16 @@ export function generateChunkTerrain(
       const worldX = cx * CHUNK_SIZE + lx;
       const worldZ = cz * CHUNK_SIZE + lz;
 
-      // Generate height using noise (scale and offset for terrain variation)
-      const noiseValue = noise.noise2D(worldX * 0.05, worldZ * 0.05);
-      const height = Math.floor(12 + noiseValue * 8); // Height between 4-20
+      // Regional variation - determines how mountainous an area is (low frequency)
+      const regionNoise = noise.noise2D(worldX * 0.008, worldZ * 0.008);
+      const mountainFactor = (regionNoise + 1) * 0.5; // 0 to 1
+      
+      // Base terrain noise
+      const noiseValue = noise.noise2D(worldX * 0.03, worldZ * 0.03);
+      
+      // Amplitude varies by region: flat areas = 2, mountainous = 8
+      const amplitude = 2 + mountainFactor * 6;
+      const height = Math.floor(12 + noiseValue * amplitude);
 
       for (let ly = 0; ly < CHUNK_SIZE; ly++) {
         const worldY = cy * CHUNK_SIZE + ly;
