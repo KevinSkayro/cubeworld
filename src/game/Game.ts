@@ -27,7 +27,7 @@ export class Game {
   mineTargetKey: string | null = null;
   mineStartTime: number = 0;
   mineHoldMs: number = 500;
-  placeCooldownMs: number = 100; // Cooldown between block placements
+  placeCooldownMs: number = 200; // Cooldown between block placements
   lastPlaceTime: number = 0;
   thirdPerson: boolean = false;
   textureAtlas: TextureAtlas;

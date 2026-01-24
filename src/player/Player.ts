@@ -15,6 +15,11 @@ export class Player {
   position: THREE.Vector3;
   velocity: THREE.Vector3 = new THREE.Vector3();
   speed: number = 0.1;
+  sprintSpeed: number = 0.18; // Sprint speed multiplier
+  isSprinting: boolean = false;
+  lastWPressedTime: number = 0;
+  doublePressWindow: number = 0.3; // Time window for double-press in seconds
+  wasWPressed: boolean = false;
   input: Input;
   camera: THREE.Camera;
   gravity: number = -0.02;
@@ -276,10 +281,32 @@ export class Player {
     // Apply gravity
     this.velocity.y += this.gravity;
 
+    // Handle sprint double-press detection
+    const isWPressed = this.input.isKeyPressed("w");
+    const wJustPressed = isWPressed && !this.wasWPressed;
+    const wJustReleased = !isWPressed && this.wasWPressed;
+    
+    if (wJustPressed) {
+      const now = performance.now() / 1000; // Convert to seconds
+      const timeSinceLastPress = now - this.lastWPressedTime;
+      
+      // Check if this is a double-press within the time window
+      if (timeSinceLastPress > 0 && timeSinceLastPress < this.doublePressWindow) {
+        this.isSprinting = true;
+      }
+      
+      this.lastWPressedTime = now;
+    }
+    
+    // Stop sprinting when 'w' is released
+    if (wJustReleased) {
+      this.isSprinting = false;
+    }
+    
     // Horizontal movement
     const direction = new THREE.Vector3();
 
-    if (this.input.isKeyPressed("w")) {
+    if (isWPressed) {
       direction.z -= 1;
     }
     if (this.input.isKeyPressed("s")) {
@@ -297,12 +324,20 @@ export class Player {
       direction.applyQuaternion(this.camera.quaternion);
       direction.y = 0; // Keep movement horizontal
       direction.normalize();
-      this.velocity.x = direction.x * this.speed;
-      this.velocity.z = direction.z * this.speed;
+      
+      // Use sprint speed if sprinting, otherwise normal speed
+      const currentSpeed = this.isSprinting ? this.sprintSpeed : this.speed;
+      this.velocity.x = direction.x * currentSpeed;
+      this.velocity.z = direction.z * currentSpeed;
     } else {
       this.velocity.x = 0;
       this.velocity.z = 0;
+      // Stop sprinting if not moving
+      this.isSprinting = false;
     }
+    
+    // Remember if 'w' was pressed for next frame
+    this.wasWPressed = isWPressed;
 
     // Jump
     const isSpacePressed = this.input.isKeyPressed(" ");
