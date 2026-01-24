@@ -27,6 +27,8 @@ export class Game {
   mineTargetKey: string | null = null;
   mineStartTime: number = 0;
   mineHoldMs: number = 500;
+  placeCooldownMs: number = 100; // Cooldown between block placements
+  lastPlaceTime: number = 0;
   thirdPerson: boolean = false;
   textureAtlas: TextureAtlas;
   chunkMaterial: THREE.MeshPhongMaterial;
@@ -155,14 +157,51 @@ export class Game {
       this.mineStartTime = 0;
     }
 
-    // Right click - place block
-    if (this.input.consumeRightClick()) {
-      const placeX = hit.blockX + hit.normal.x;
-      const placeY = hit.blockY + hit.normal.y;
-      const placeZ = hit.blockZ + hit.normal.z;
-      this.world.setBlock(placeX, placeY, placeZ, BLOCK_STONE);
-      this.remeshAffectedChunks(placeX, placeY, placeZ);
+    // Right click - place block (hold to continuously place)
+    if (this.input.isRightDown()) {
+      const now = performance.now();
+      if (now - this.lastPlaceTime >= this.placeCooldownMs) {
+        const placeX = hit.blockX + hit.normal.x;
+        const placeY = hit.blockY + hit.normal.y;
+        const placeZ = hit.blockZ + hit.normal.z;
+        
+        // Check if placing this block would collide with the player
+        if (!this.wouldBlockCollideWithPlayer(placeX, placeY, placeZ)) {
+          this.world.setBlock(placeX, placeY, placeZ, BLOCK_STONE);
+          this.remeshAffectedChunks(placeX, placeY, placeZ);
+          this.lastPlaceTime = now;
+        }
+      }
     }
+  }
+
+  private wouldBlockCollideWithPlayer(blockX: number, blockY: number, blockZ: number): boolean {
+    const pos = this.player.position;
+    const radius = this.player.radius;
+    const height = this.player.height;
+    
+    // Player's bounding box
+    const playerMinX = pos.x - radius;
+    const playerMaxX = pos.x + radius;
+    const playerMinY = pos.y - height;
+    const playerMaxY = pos.y;
+    const playerMinZ = pos.z - radius;
+    const playerMaxZ = pos.z + radius;
+    
+    // Block's bounding box (blocks are 1x1x1)
+    const blockMinX = blockX;
+    const blockMaxX = blockX + 1;
+    const blockMinY = blockY;
+    const blockMaxY = blockY + 1;
+    const blockMinZ = blockZ;
+    const blockMaxZ = blockZ + 1;
+    
+    // Check if bounding boxes overlap
+    const overlapX = playerMaxX > blockMinX && playerMinX < blockMaxX;
+    const overlapY = playerMaxY > blockMinY && playerMinY < blockMaxY;
+    const overlapZ = playerMaxZ > blockMinZ && playerMinZ < blockMaxZ;
+    
+    return overlapX && overlapY && overlapZ;
   }
 
   private remeshAffectedChunks(blockX: number, blockY: number, blockZ: number) {
