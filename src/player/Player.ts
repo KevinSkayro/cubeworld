@@ -18,7 +18,10 @@ export class Player {
   input: Input;
   camera: THREE.Camera;
   gravity: number = -0.02;
-  jumpStrength: number = 0.3;
+  jumpStrength: number = 0.22;
+  jumpCooldown: number = 0;
+  jumpCooldownDuration: number = 0.5; // Cooldown duration in seconds
+  wasSpacePressed: boolean = false; // Track if space was pressed in previous frame
   onGround: boolean = false;
   height: number = 1.6;
   radius: number = 0.15;
@@ -302,10 +305,27 @@ export class Player {
     }
 
     // Jump
-    if (this.input.isKeyPressed(" ") && this.onGround) {
+    const isSpacePressed = this.input.isKeyPressed(" ");
+    const spaceJustPressed = isSpacePressed && !this.wasSpacePressed; // Space was just pressed this frame
+    
+    // Reset cooldown if space was just pressed (user released and pressed again)
+    if (spaceJustPressed) {
+      this.jumpCooldown = 0;
+    }
+    
+    if (isSpacePressed && this.onGround && this.jumpCooldown <= 0) {
       this.velocity.y = this.jumpStrength;
       this.onGround = false;
+      this.jumpCooldown = this.jumpCooldownDuration; // Reset cooldown
     }
+    
+    // Update jump cooldown
+    if (this.jumpCooldown > 0) {
+      this.jumpCooldown -= 0.016; // Assuming ~60fps, decrement by delta time
+    }
+    
+    // Remember if space was pressed for next frame
+    this.wasSpacePressed = isSpacePressed;
 
     // Apply velocity with collision: resolve vertical first to avoid sideways push when landing
     this.position.y += this.velocity.y;
