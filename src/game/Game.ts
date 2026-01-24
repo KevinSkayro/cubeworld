@@ -4,7 +4,7 @@ import { Input } from "../input/Input";
 import { Player } from "../player/Player";
 import { World } from "../world/World";
 import { ChunkManager } from "../world/ChunkManager";
-import { CHUNK_SIZE, BLOCK_AIR, BLOCK_STONE } from "../world/constants";
+import { CHUNK_SIZE, BLOCK_AIR, BLOCK_STONE, MAX_BUILD_HEIGHT } from "../world/constants";
 import { MesherWorkerResponse } from "../world/meshing/types";
 import { voxelRaycast } from "../world/raycast/voxelRaycast";
 import { TextureAtlas } from "../world/TextureAtlas";
@@ -164,6 +164,12 @@ export class Game {
         const placeX = hit.blockX + hit.normal.x;
         const placeY = hit.blockY + hit.normal.y;
         const placeZ = hit.blockZ + hit.normal.z;
+        
+        // Check if block placement is within height limit
+        if (placeY >= MAX_BUILD_HEIGHT) {
+          // Block is too high, don't place it
+          return;
+        }
         
         // Check if placing this block would collide with the player
         if (!this.wouldBlockCollideWithPlayer(placeX, placeY, placeZ)) {

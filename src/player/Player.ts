@@ -56,7 +56,7 @@ export class Player {
 
   private loadModel() {
     const texLoader = new TextureLoader();
-    const textureUrl = new URL("./textures/png/texture-b.png", import.meta.url).href;
+    const textureUrl = new URL("@/assets/player/textures/texture-a.png", import.meta.url).href;
     
     texLoader.load(
       textureUrl,

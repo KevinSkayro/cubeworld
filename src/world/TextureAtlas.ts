@@ -2,18 +2,18 @@ import * as THREE from "three";
 import { ATLAS_SIZE } from "./textureConfig";
 
 // Import textures using Vite's asset handling
-import grassPath from "../textures/grass.png";
-import grassSidePath from "../textures/grass_side.png";
-import dirtPath from "../textures/dirt.png";
-import stonePath from "../textures/stone.png";
-import sandPath from "../textures/sand.png";
-import snowPath from "../textures/snow.png";
-import snowSidePath from "../textures/snow_side.png";
-import coalOrePath from "../textures/coal_ore.png";
-import ironOrePath from "../textures/iron_ore.png";
-import treeSidePath from "../textures/tree_side.png";
-import treeTopPath from "../textures/tree_top.png";
-import leavesPath from "../textures/leaves.png";
+import grassPath from "@/assets/blocks/textures/grass.png";
+import grassSidePath from "@/assets/blocks/textures/grass_side.png";
+import dirtPath from "@/assets/blocks/textures/dirt.png";
+import stonePath from "@/assets/blocks/textures/stone.png";
+import sandPath from "@/assets/blocks/textures/sand.png";
+import snowPath from "@/assets/blocks/textures/snow.png";
+import snowSidePath from "@/assets/blocks/textures/snow_side.png";
+import coalOrePath from "@/assets/blocks/textures/coal_ore.png";
+import ironOrePath from "@/assets/blocks/textures/iron_ore.png";
+import treeSidePath from "@/assets/blocks/textures/tree_side.png";
+import treeTopPath from "@/assets/blocks/textures/tree_top.png";
+import leavesPath from "@/assets/blocks/textures/leaves.png";
 
 // Texture paths in order
 const TEXTURE_PATHS = [
