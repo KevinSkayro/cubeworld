@@ -1,7 +1,9 @@
 import * as THREE from "three";
 import { Input } from "../input/Input";
-import { BLOCK_AIR } from "../world/constants";
+import { BLOCK_AIR, BLOCK_GRASS, BLOCK_STONE } from "../world/constants";
 import { TextureLoader, SRGBColorSpace } from "three";
+import grassFootstepSound from "@/assets/player/audio/footstep_grass_004.ogg";
+import stoneFootstepSound from "@/assets/player/audio/footstep_stone_002.ogg";
 
 const EPS = 1e-3; // Small offset to avoid getting stuck on freshly mined blocks
 
@@ -20,7 +22,7 @@ export class Player {
   onGround: boolean = false;
   height: number = 1.6;
   radius: number = 0.15;
-  thirdPerson: boolean = true;
+  thirdPerson: boolean = false;
   thirdPersonDistance: number = 3;
   thirdPersonHeight: number = 1;
   checkBlock: (x: number, y: number, z: number) => number;
@@ -39,6 +41,12 @@ export class Player {
   walkTime: number = 0;
   walkSpeed: number = 10; // How fast the limbs swing
   walkAmplitude: number = 0.5; // Max rotation in radians (~30 degrees)
+  
+  // Audio
+  grassFootstepAudio: HTMLAudioElement;
+  stoneFootstepAudio: HTMLAudioElement;
+  footstepCooldown: number = 0;
+  footstepInterval: number = 0.315; // Time between footsteps in seconds
 
   constructor(
     camera: THREE.Camera,
@@ -51,6 +59,16 @@ export class Player {
     this.scene = scene;
     this.checkBlock = checkBlock;
     this.position = camera.position.clone();
+    
+    // Initialize footstep audio
+    this.grassFootstepAudio = new Audio(grassFootstepSound);
+    this.grassFootstepAudio.volume = 0.1;
+    this.grassFootstepAudio.preload = "auto";
+    
+    this.stoneFootstepAudio = new Audio(stoneFootstepSound);
+    this.stoneFootstepAudio.volume = 0.1;
+    this.stoneFootstepAudio.preload = "auto";
+    
     this.loadModel();
   }
 
@@ -302,6 +320,7 @@ export class Player {
     this.updateCameraPosition();
     this.updateModelTransform();
     this.updateWalkAnimation();
+    this.updateFootsteps();
   }
 
   private updateWalkAnimation() {
@@ -327,6 +346,50 @@ export class Player {
       if (this.rightArm) this.rightArm.rotation.x *= (1 - returnSpeed);
       if (this.leftLeg) this.leftLeg.rotation.x *= (1 - returnSpeed);
       if (this.rightLeg) this.rightLeg.rotation.x *= (1 - returnSpeed);
+    }
+  }
+
+  private getBlockUnderFeet(): number {
+    const feetY = Math.floor(this.position.y - this.height - EPS);
+    const blockX = Math.floor(this.position.x);
+    const blockZ = Math.floor(this.position.z);
+    return this.checkBlock(blockX, feetY, blockZ);
+  }
+
+  private updateFootsteps() {
+    // Update cooldown
+    if (this.footstepCooldown > 0) {
+      this.footstepCooldown -= 0.016; // Assuming ~60fps
+    }
+
+    // Check if player is moving and on ground
+    const isMoving = Math.abs(this.velocity.x) > 0.001 || Math.abs(this.velocity.z) > 0.001;
+    
+    if (isMoving && this.onGround && this.footstepCooldown <= 0) {
+      const blockType = this.getBlockUnderFeet();
+      
+      // Play footstep sound based on block type
+      if (blockType === BLOCK_GRASS) {
+        // Reset audio to beginning and play
+        this.grassFootstepAudio.currentTime = 0;
+        this.grassFootstepAudio.play().catch((err) => {
+          // Ignore audio play errors (e.g., user hasn't interacted with page yet)
+          console.debug("Grass footstep audio play failed:", err);
+        });
+        
+        // Reset cooldown
+        this.footstepCooldown = this.footstepInterval;
+      } else if (blockType === BLOCK_STONE) {
+        // Play stone footstep sound
+        this.stoneFootstepAudio.currentTime = 0;
+        this.stoneFootstepAudio.play().catch((err) => {
+          // Ignore audio play errors (e.g., user hasn't interacted with page yet)
+          console.debug("Stone footstep audio play failed:", err);
+        });
+        
+        // Reset cooldown
+        this.footstepCooldown = this.footstepInterval;
+      }
     }
   }
 
