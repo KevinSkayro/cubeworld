@@ -4,10 +4,10 @@ import { Input } from "../input/Input";
 import { Player } from "../player/Player";
 import { World } from "../world/World";
 import { ChunkManager } from "../world/ChunkManager";
-import { CHUNK_SIZE, BLOCK_AIR, BLOCK_STONE, MAX_BUILD_HEIGHT } from "../world/constants";
+import { CHUNK_SIZE, BLOCK_AIR, BLOCK_STONE, BLOCK_GRASS, BLOCK_DIRT,BLOCK_SAND, BLOCK_SNOW, MAX_BUILD_HEIGHT } from "../world/constants";
 import { MesherWorkerResponse } from "../world/meshing/types";
 import { voxelRaycast } from "../world/raycast/voxelRaycast";
-import { TextureAtlas } from "../world/TextureAtlas";
+import { TextureAtlas } from "../world/textures/atlas";
 
 interface WorldgenWorkerResponse {
   chunkKey: string;
@@ -32,6 +32,17 @@ export class Game {
   thirdPerson: boolean = false;
   textureAtlas: TextureAtlas;
   chunkMaterial: THREE.MeshPhongMaterial;
+  
+  // Block selection
+  selectedBlockType: number = BLOCK_STONE;
+  hotbarSlots: Array<{ blockType: number; name: string }> = [
+    { blockType: BLOCK_GRASS, name: "Grass" },
+    { blockType: BLOCK_DIRT, name: "Dirt" },
+    { blockType: BLOCK_STONE, name: "Stone" },
+    { blockType: BLOCK_SAND, name: "Sand" },
+    { blockType: BLOCK_SNOW, name: "Snow" },
+  ];
+  hotbarElement: HTMLElement | null = null;
 
   constructor() {
     this.renderer = new Renderer();
@@ -82,6 +93,9 @@ export class Game {
       this.player.position.y,
       this.player.position.z,
     );
+    
+    // Initialize hotbar UI
+    this.initHotbar();
   }
 
   private onWorldgenComplete(response: WorldgenWorkerResponse) {
@@ -120,6 +134,87 @@ export class Game {
     if (this.input.consumeKeyPress("c")) {
       this.thirdPerson = !this.thirdPerson;
       this.player.setThirdPerson(this.thirdPerson);
+    }
+  }
+  
+  private initHotbar() {
+    this.hotbarElement = document.getElementById("hotbar");
+    if (!this.hotbarElement) return;
+    
+    // Clear existing slots
+    this.hotbarElement.innerHTML = "";
+    
+    // Create slots for each block type
+    this.hotbarSlots.forEach((slot, index) => {
+      const slotElement = document.createElement("div");
+      slotElement.className = "hotbar-slot";
+      slotElement.dataset.blockType = slot.blockType.toString();
+      
+      // Add slot number
+      const numberElement = document.createElement("div");
+      numberElement.className = "hotbar-slot-number";
+      numberElement.textContent = (index + 1).toString();
+      slotElement.appendChild(numberElement);
+      
+      // Add block name
+      const nameElement = document.createElement("div");
+      nameElement.textContent = slot.name;
+      slotElement.appendChild(nameElement);
+      
+      this.hotbarElement!.appendChild(slotElement);
+    });
+    
+    // Set initial selection
+    this.updateHotbarSelection();
+  }
+  
+  private updateHotbarSelection() {
+    if (!this.hotbarElement) return;
+    
+    const slots = this.hotbarElement.querySelectorAll(".hotbar-slot");
+    slots.forEach((slot) => {
+      const blockType = parseInt((slot as HTMLElement).dataset.blockType || "0");
+      if (blockType === this.selectedBlockType) {
+        slot.classList.add("selected");
+      } else {
+        slot.classList.remove("selected");
+      }
+    });
+  }
+  
+  private handleBlockSelection() {
+    // Handle number keys 1-9 for block selection
+    for (let i = 1; i <= 9; i++) {
+      if (this.input.consumeKeyPress(i.toString())) {
+        const slotIndex = i - 1;
+        if (slotIndex < this.hotbarSlots.length) {
+          this.selectedBlockType = this.hotbarSlots[slotIndex].blockType;
+          this.updateHotbarSelection();
+        }
+      }
+    }
+    
+    // Handle mouse wheel scrolling
+    const wheelDelta = this.input.consumeWheelDelta();
+    if (wheelDelta !== 0) {
+      const currentIndex = this.hotbarSlots.findIndex(
+        slot => slot.blockType === this.selectedBlockType
+      );
+      
+      if (currentIndex !== -1) {
+        // Calculate new index with wrapping
+        // Positive wheelDelta = scrolled down = next item (higher index)
+        // Negative wheelDelta = scrolled up = previous item (lower index)
+        let newIndex = currentIndex + wheelDelta;
+        if (newIndex < 0) {
+          newIndex = this.hotbarSlots.length - 1; // Wrap to end
+        } else if (newIndex >= this.hotbarSlots.length) {
+          newIndex = 0; // Wrap to beginning
+        }
+        
+        this.selectedBlockType = this.hotbarSlots[newIndex].blockType;
+        this.updateHotbarSelection();
+      }
     }
   }
 
@@ -173,7 +268,7 @@ export class Game {
         
         // Check if placing this block would collide with the player
         if (!this.wouldBlockCollideWithPlayer(placeX, placeY, placeZ)) {
-          this.world.setBlock(placeX, placeY, placeZ, BLOCK_STONE);
+          this.world.setBlock(placeX, placeY, placeZ, this.selectedBlockType);
           this.remeshAffectedChunks(placeX, placeY, placeZ);
           this.lastPlaceTime = now;
         }
@@ -240,6 +335,7 @@ export class Game {
   gameLoop = () => {
     this.player.update();
     this.handlePerspectiveToggle();
+    this.handleBlockSelection();
     this.handleBlockInteraction();
     this.chunkManager.update(
       this.player.position.x,

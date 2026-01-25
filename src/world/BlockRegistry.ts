@@ -1,4 +1,4 @@
-import { TEX } from "./textureConfig";
+import { BLOCK_DEFINITIONS, type TextureConfig } from "./blocks/definitions";
 
 // Face indices: +X, -X, +Y, -Y, +Z, -Z (right, left, top, bottom, front, back)
 export interface BlockFaceTextures {
@@ -17,49 +17,44 @@ export interface BlockDefinition {
   textures: BlockFaceTextures;
 }
 
-// Helper to create uniform textures (same on all faces)
-function uniformTextures(textureIndex: number): BlockFaceTextures {
-  return {
-    right: textureIndex,
-    left: textureIndex,
-    top: textureIndex,
-    bottom: textureIndex,
-    front: textureIndex,
-    back: textureIndex,
-  };
-}
-
-// Helper to create top/side/bottom textures
-function topSideBottomTextures(top: number, side: number, bottom: number): BlockFaceTextures {
-  return {
-    right: side,
-    left: side,
-    top: top,
-    bottom: bottom,
-    front: side,
-    back: side,
-  };
+// Helper to convert texture config to face textures
+function textureConfigToFaces(config: TextureConfig): BlockFaceTextures {
+  if (config.type === "uniform") {
+    return {
+      right: config.texture,
+      left: config.texture,
+      top: config.texture,
+      bottom: config.texture,
+      front: config.texture,
+      back: config.texture,
+    };
+  } else {
+    // topSideBottom
+    return {
+      right: config.side,
+      left: config.side,
+      top: config.top,
+      bottom: config.bottom,
+      front: config.side,
+      back: config.side,
+    };
+  }
 }
 
 export class BlockRegistry {
   private blocks: Map<number, BlockDefinition> = new Map();
 
   constructor() {
-    // Air - no textures (won't be rendered)
-    this.register(0, "Air", false, uniformTextures(0));
-    
-    // Grass - green top, grass_side on sides, dirt on bottom
-    this.register(1, "Grass", true, topSideBottomTextures(TEX.GRASS_TOP, TEX.GRASS_SIDE, TEX.DIRT));
-    
-    // Dirt - same on all faces
-    this.register(2, "Dirt", true, uniformTextures(TEX.DIRT));
-    
-    // Stone - same on all faces
-    this.register(3, "Stone", true, uniformTextures(TEX.STONE));
-  }
-
-  private register(id: number, name: string, solid: boolean, textures: BlockFaceTextures): void {
-    this.blocks.set(id, { id, name, solid, textures });
+    // Register all blocks from centralized definitions
+    for (const def of BLOCK_DEFINITIONS) {
+      const textures = textureConfigToFaces(def.textureConfig);
+      this.blocks.set(def.id, {
+        id: def.id,
+        name: def.name,
+        solid: def.solid,
+        textures,
+      });
+    }
   }
 
   getBlock(id: number): BlockDefinition | undefined {

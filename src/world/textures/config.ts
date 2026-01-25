@@ -34,4 +34,3 @@ export function getTextureUVs(textureIndex: number): [number, number, number, nu
   
   return [u0, v0, u1, v1];
 }
-

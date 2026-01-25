@@ -50,10 +50,46 @@
         height: 100%;
         transform: translateX(-50%);
       }
+      .hotbar {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 4px;
+        pointer-events: none;
+        z-index: 1000;
+      }
+      .hotbar-slot {
+        width: 50px;
+        height: 50px;
+        background: rgba(0, 0, 0, 0.5);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        color: white;
+        user-select: none;
+        position: relative;
+      }
+      .hotbar-slot.selected {
+        border-color: rgba(255, 255, 255, 0.9);
+        background: rgba(255, 255, 255, 0.2);
+        box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+      }
+      .hotbar-slot-number {
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.7);
+      }
     </style>
   </head>
   <body>
     <div class="crosshair"></div>
+    <div class="hotbar" id="hotbar"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

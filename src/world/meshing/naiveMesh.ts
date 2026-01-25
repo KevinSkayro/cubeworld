@@ -1,7 +1,7 @@
 import { Chunk } from "../Chunk";
 import { BlockRegistry } from "../BlockRegistry";
 import { CHUNK_SIZE } from "../constants";
-import { getTextureUVs } from "../textureConfig";
+import { getTextureUVs } from "../textures/config";
 
 export interface MeshData {
   positions: Float32Array;

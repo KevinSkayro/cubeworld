@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { ATLAS_SIZE } from "./textureConfig";
+import { ATLAS_SIZE } from "./config";
 
 // Import textures using Vite's asset handling
 import grassPath from "@/assets/blocks/textures/grass.png";
@@ -24,7 +24,7 @@ const TEXTURE_PATHS = [
   sandPath,        // 4 - sand
   snowPath,        // 5 - snow top
   snowSidePath,    // 6 - snow side
-  coalOrePath,     // 7 - coal ore
+  coalOrePath,    // 7 - coal ore
   ironOrePath,     // 8 - iron ore
   treeSidePath,    // 9 - tree side
   treeTopPath,     // 10 - tree top

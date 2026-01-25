@@ -4,7 +4,12 @@ export const CHUNK_VOLUME = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
 // Maximum height at which blocks can be placed (prevents infinite building and unnecessary chunk creation)
 export const MAX_BUILD_HEIGHT = 128;
 
-export const BLOCK_AIR = 0;
-export const BLOCK_GRASS = 1;
-export const BLOCK_DIRT = 2;
-export const BLOCK_STONE = 3;
+// Re-export block constants from centralized definitions
+export {
+  BLOCK_AIR,
+  BLOCK_GRASS,
+  BLOCK_DIRT,
+  BLOCK_STONE,
+  BLOCK_SAND,
+  BLOCK_SNOW,
+} from "./blocks/definitions";

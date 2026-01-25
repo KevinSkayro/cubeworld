@@ -9,6 +9,7 @@ export class Input {
   rightClick: boolean = false;
   leftDown: boolean = false;
   rightDown: boolean = false;
+  wheelDelta: number = 0; // Mouse wheel delta (positive = scroll up, negative = scroll down)
 
   constructor(camera: THREE.Camera, canvas: HTMLCanvasElement) {
     this.controls = new PointerLockControls(camera, canvas);
@@ -47,6 +48,13 @@ export class Input {
       if (e.button === 0) this.leftDown = false;
       if (e.button === 2) this.rightDown = false;
     });
+
+    document.addEventListener("wheel", (e) => {
+      if (this.controls.isLocked) {
+        // Accumulate wheel delta
+        this.wheelDelta += e.deltaY > 0 ? 1 : -1;
+      }
+    }, { passive: true });
 
     canvas.addEventListener("contextmenu", (e) => e.preventDefault());
   }
@@ -88,5 +96,11 @@ export class Input {
 
   isRightDown(): boolean {
     return this.rightDown;
+  }
+
+  consumeWheelDelta(): number {
+    const delta = this.wheelDelta;
+    this.wheelDelta = 0;
+    return delta;
   }
 }
