@@ -2,8 +2,8 @@
 
 exports[`generateChunk determinism > matches the committed output snapshot 1`] = `
 {
-  "-3,0,7": 2415052488,
-  "0,0,0": 334654092,
-  "0,1,0": 2103738237,
+  "-3,0,7": 2889306989,
+  "0,0,0": 3813122720,
+  "0,1,0": 2377110281,
 }
 `;

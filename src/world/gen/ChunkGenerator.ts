@@ -10,6 +10,7 @@ import { makeNoise } from "./noise";
 import type { GenContext, GenStage } from "./types";
 import { generateTerrainShape } from "./terrain";
 import { applySurfacePass } from "./surface";
+import { placeOres } from "./ores";
 import { carveCaves } from "./caves";
 
 export class ChunkGenerator {
@@ -18,9 +19,9 @@ export class ChunkGenerator {
 
   constructor(seed: number) {
     this.ctx = { seed, noise: makeNoise(seed) };
-    // Ordered generation pipeline. Add later stages (ores, decorations) to
-    // this list as they are implemented.
-    this.stages = [generateTerrainShape, applySurfacePass, carveCaves];
+    // Ordered generation pipeline. Ores are placed before caves so cave
+    // carving exposes veins in cave walls. Add later stages (decorations) here.
+    this.stages = [generateTerrainShape, applySurfacePass, placeOres, carveCaves];
   }
 
   generate(cx: number, cy: number, cz: number): Uint16Array {

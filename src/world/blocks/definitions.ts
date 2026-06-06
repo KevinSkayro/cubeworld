@@ -75,3 +75,5 @@ export const BLOCK_DIRT = 2;
 export const BLOCK_STONE = 3;
 export const BLOCK_SAND = 4;
 export const BLOCK_SNOW = 5;
+export const BLOCK_COAL_ORE = 6;
+export const BLOCK_IRON_ORE = 7;
