@@ -8,6 +8,7 @@
 
 import type { NoiseSampler } from "../world/gen/noise";
 import { sampleBiomeParams } from "../world/biome/params";
+import { selectBiome } from "../world/biome/biomeTable";
 
 export class BiomeOverlay {
   visible = false;
@@ -95,11 +96,11 @@ export class BiomeOverlay {
       for (let px = 0; px < this.size; px++) {
         const wx = centerX - half + px * this.blocksPerPixel;
         const wz = centerZ - half + py * this.blocksPerPixel;
-        const p = sampleBiomeParams(noise, wx, wz);
+        const biome = selectBiome(sampleBiomeParams(noise, wx, wz));
         const i = (py * this.size + px) * 4;
-        img.data[i] = Math.round(p.temperature * 255); // R
-        img.data[i + 1] = Math.round(p.continentalness * 255); // G
-        img.data[i + 2] = Math.round(p.humidity * 255); // B
+        img.data[i] = biome.debugColor[0]; // R
+        img.data[i + 1] = biome.debugColor[1]; // G
+        img.data[i + 2] = biome.debugColor[2]; // B
         img.data[i + 3] = 255;
       }
     }
@@ -114,8 +115,10 @@ export class BiomeOverlay {
 
   private drawCaption(noise: NoiseSampler, centerX: number, centerZ: number) {
     const p = sampleBiomeParams(noise, centerX, centerZ);
+    const biome = selectBiome(p);
     this.caption.textContent =
+      `${biome.name}\n` +
       `T ${p.temperature.toFixed(2)}  H ${p.humidity.toFixed(2)}  ` +
-      `C ${p.continentalness.toFixed(2)}\nR=temp G=cont B=humid`;
+      `C ${p.continentalness.toFixed(2)}`;
   }
 }

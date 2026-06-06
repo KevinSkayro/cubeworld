@@ -14,6 +14,7 @@ import {
   BLOCK_STONE,
 } from "../constants";
 import { FIELD } from "./noise";
+import type { NoiseSampler } from "./noise";
 import { rand01, randInt } from "./random";
 import { localIndex } from "./coords";
 import type { GenContext } from "./types";
@@ -25,6 +26,22 @@ const SALT_STONE_PCT = 2;
 const SALT_SPREAD_CHANCE = 3;
 const SALT_SPREAD_PCT = 4;
 const SALT_BLOCK_STONE = 5;
+
+/**
+ * Terrain surface height for a world column. Single source of truth shared by
+ * the terrain stage and the surface pass. Amplitude scales with a low-frequency
+ * "mountain factor" so some regions are flat and others rugged.
+ */
+export function columnHeight(
+  noise: NoiseSampler,
+  worldX: number,
+  worldZ: number,
+): number {
+  const mountainFactor = (noise.fbm2D(worldX, worldZ, FIELD.REGION) + 1) * 0.5;
+  const noiseValue = noise.fbm2D(worldX, worldZ, FIELD.TERRAIN);
+  const amplitude = 2 + mountainFactor * 6;
+  return Math.floor(12 + noiseValue * amplitude);
+}
 
 export function generateTerrainShape(
   ctx: GenContext,
@@ -47,17 +64,7 @@ export function generateTerrainShape(
       const worldX = cx * CHUNK_SIZE + lx;
       const worldZ = cz * CHUNK_SIZE + lz;
 
-      // Regional variation - how mountainous an area is (low frequency).
-      const regionNoise = noise.fbm2D(worldX, worldZ, FIELD.REGION);
-      const mountainFactor = (regionNoise + 1) * 0.5; // 0 to 1
-
-      // Base terrain noise.
-      const noiseValue = noise.fbm2D(worldX, worldZ, FIELD.TERRAIN);
-
-      // Amplitude varies by region: flat areas = 2, mountainous = 8.
-      const amplitude = 2 + mountainFactor * 6;
-      const height = Math.floor(12 + noiseValue * amplitude);
-
+      const height = columnHeight(noise, worldX, worldZ);
       const isHighTerrain = height > 15;
 
       // 1 in 20 chance that high terrain is 80-95% stone (stone-heavy mountains).
@@ -83,12 +90,8 @@ export function generateTerrainShape(
       const worldX = cx * CHUNK_SIZE + lx;
       const worldZ = cz * CHUNK_SIZE + lz;
 
-      const regionNoise = noise.fbm2D(worldX, worldZ, FIELD.REGION);
-      const mountainFactor = (regionNoise + 1) * 0.5;
-
-      const noiseValue = noise.fbm2D(worldX, worldZ, FIELD.TERRAIN);
-      const amplitude = 2 + mountainFactor * 6;
-      const height = Math.floor(12 + noiseValue * amplitude);
+      const height = columnHeight(noise, worldX, worldZ);
+      const mountainFactor = (noise.fbm2D(worldX, worldZ, FIELD.REGION) + 1) * 0.5;
 
       // Larger stone patches (lower frequency = larger patches).
       const stonePatchNoise = noise.fbm2D(worldX, worldZ, FIELD.STONE_PATCH);

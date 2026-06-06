@@ -9,6 +9,7 @@ import { CHUNK_VOLUME } from "../constants";
 import { makeNoise } from "./noise";
 import type { GenContext, GenStage } from "./types";
 import { generateTerrainShape } from "./terrain";
+import { applySurfacePass } from "./surface";
 
 export class ChunkGenerator {
   readonly ctx: GenContext;
@@ -16,9 +17,9 @@ export class ChunkGenerator {
 
   constructor(seed: number) {
     this.ctx = { seed, noise: makeNoise(seed) };
-    // Ordered generation pipeline. Add later stages (surface, caves, ores,
+    // Ordered generation pipeline. Add later stages (caves, ores,
     // decorations) to this list as they are implemented.
-    this.stages = [generateTerrainShape];
+    this.stages = [generateTerrainShape, applySurfacePass];
   }
 
   generate(cx: number, cy: number, cz: number): Uint16Array {
