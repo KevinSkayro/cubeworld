@@ -3,16 +3,18 @@ import { World } from "./World";
 import { Chunk } from "./Chunk";
 import { CHUNK_SIZE } from "./constants";
 import { loadChunkBlocks, saveChunkBlocks } from "./persistence/indexedDB";
+import { parseKey } from "./gen/coords";
+import type { WorldSettings } from "./gen/settings";
+import { selectChunksToLoad, shouldUnload } from "./chunkLoadOrder";
 
 export class ChunkManager {
   world: World;
   loadedChunks: Set<string> = new Set();
   chunkMeshes: Map<string, THREE.Mesh> = new Map();
-  renderRadius: number = 4;
+  settings: WorldSettings;
   scene: THREE.Scene;
   mesherWorker: Worker;
   worldgenWorker: Worker;
-  seed: number;
   onMeshReady: (chunkKey: string, meshData: any) => void;
 
   constructor(
@@ -20,14 +22,14 @@ export class ChunkManager {
     scene: THREE.Scene,
     mesherWorker: Worker,
     worldgenWorker: Worker,
-    seed: number,
+    settings: WorldSettings,
     onMeshReady: (chunkKey: string, meshData: any) => void,
   ) {
     this.world = world;
     this.scene = scene;
     this.mesherWorker = mesherWorker;
     this.worldgenWorker = worldgenWorker;
-    this.seed = seed;
+    this.settings = settings;
     this.onMeshReady = onMeshReady;
   }
 
@@ -41,81 +43,63 @@ export class ChunkManager {
   }
 
   update(playerX: number, playerY: number, playerZ: number) {
-    const playerChunkX = Math.floor(playerX / CHUNK_SIZE);
-    const playerChunkZ = Math.floor(playerZ / CHUNK_SIZE);
+    const pcx = Math.floor(playerX / CHUNK_SIZE);
+    const pcy = Math.floor(playerY / CHUNK_SIZE);
+    const pcz = Math.floor(playerZ / CHUNK_SIZE);
 
-    const chunksToLoad: string[] = [];
+    // Dispatch up to chunkLoadBudget nearest unloaded chunks this tick. The
+    // closest chunks load first, and priority is recomputed every tick so the
+    // player's surroundings stay current as they move.
+    const toLoad = selectChunksToLoad(pcx, pcy, pcz, this.settings, (k) =>
+      this.loadedChunks.has(k),
+    );
 
-    // Load chunks at ground level (cy=0) and above (cy=1) for terrain
-    for (const cy of [0, 1]) {
-      for (
-        let cx = playerChunkX - this.renderRadius;
-        cx <= playerChunkX + this.renderRadius;
-        cx++
-      ) {
-        for (
-          let cz = playerChunkZ - this.renderRadius;
-          cz <= playerChunkZ + this.renderRadius;
-          cz++
-        ) {
-          const key = `${cx},${cy},${cz}`;
-          if (!this.loadedChunks.has(key)) {
-            chunksToLoad.push(key);
-          }
-        }
+    for (const key of toLoad) {
+      const [cx, cy, cz] = parseKey(key);
+      this.loadedChunks.add(key);
+
+      if (this.world.chunks.has(key)) {
+        // Already generated (e.g. revisited after unload) — just remesh.
+        this.requestMesh(key);
+        continue;
       }
-    }
 
-    // Load new chunks
-    for (const key of chunksToLoad) {
-      const [cx, cy, cz] = key.split(",").map(Number);
-      if (!this.world.chunks.has(key)) {
-        // Try persistence first; if missing, request generation
-        loadChunkBlocks(key)
-          .then((cached) => {
-            if (cached) {
-              const chunk = new Chunk(cx, cy, cz);
-              chunk.blocks = cached;
-              this.world.chunks.set(key, chunk);
-              this.requestMesh(key);
-            } else {
-              this.worldgenWorker.postMessage({
-                chunkKey: key,
-                cx,
-                cy,
-                cz,
-                seed: this.seed,
-              });
-            }
-          })
-          .catch(() => {
+      // Try persistence first; if missing, request generation.
+      loadChunkBlocks(key)
+        .then((cached) => {
+          if (cached) {
+            const chunk = new Chunk(cx, cy, cz);
+            chunk.blocks = cached;
+            this.world.chunks.set(key, chunk);
+            this.requestMesh(key);
+          } else {
             this.worldgenWorker.postMessage({
               chunkKey: key,
               cx,
               cy,
               cz,
-              seed: this.seed,
+              seed: this.settings.seed,
             });
+          }
+        })
+        .catch(() => {
+          this.worldgenWorker.postMessage({
+            chunkKey: key,
+            cx,
+            cy,
+            cz,
+            seed: this.settings.seed,
           });
-      } else {
-        // Chunk already exists, just remesh it
-        this.requestMesh(key);
-      }
-      this.loadedChunks.add(key);
+        });
     }
 
-    // Unload chunks outside radius
+    // Unload chunks outside the current render radius / vertical range.
     const chunksToUnload: string[] = [];
     for (const key of this.loadedChunks) {
-      const [cx, cy, cz] = key.split(",").map(Number);
-      const distX = Math.abs(cx - playerChunkX);
-      const distZ = Math.abs(cz - playerChunkZ);
-      const dist = Math.max(distX, distZ);
-      if (dist > this.renderRadius) {
+      if (shouldUnload(key, pcx, pcz, this.settings)) {
         chunksToUnload.push(key);
       }
     }
-
     for (const key of chunksToUnload) {
       this.unloadChunk(key);
     }

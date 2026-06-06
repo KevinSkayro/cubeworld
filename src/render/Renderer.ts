@@ -49,6 +49,20 @@ export class Renderer {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
   }
 
+  /**
+   * Scale fog and the camera far plane to the loaded render distance (in world
+   * units) so distant terrain fades out near the edge of loaded chunks instead
+   * of popping, and nothing within range is clipped.
+   */
+  setRenderDistance(blocks: number) {
+    const fog = this.scene.fog as THREE.Fog;
+    fog.near = blocks * 0.55;
+    fog.far = blocks;
+    // Margin beyond the fog so edge chunks aren't clipped before fog hides them.
+    this.camera.far = blocks + 200;
+    this.camera.updateProjectionMatrix();
+  }
+
   render() {
     this.renderer.render(this.scene, this.camera);
   }

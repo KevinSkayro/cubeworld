@@ -8,6 +8,14 @@ import { CHUNK_SIZE, BLOCK_AIR, BLOCK_STONE, BLOCK_GRASS, BLOCK_DIRT,BLOCK_SAND,
 import { MesherWorkerResponse } from "../world/meshing/types";
 import { voxelRaycast } from "../world/raycast/voxelRaycast";
 import { TextureAtlas } from "../world/textures/atlas";
+import {
+  WorldSettings,
+  DEFAULT_WORLD_SETTINGS,
+  RENDER_RADIUS_MIN,
+  RENDER_RADIUS_MAX,
+  loadRenderRadius,
+  saveRenderRadius,
+} from "../world/gen/settings";
 
 interface WorldgenWorkerResponse {
   chunkKey: string;
@@ -23,6 +31,7 @@ export class Game {
   mesherWorker: Worker;
   worldgenWorker: Worker;
   seed: number = 12345;
+  settings: WorldSettings;
   running: boolean = false;
   mineTargetKey: string | null = null;
   mineStartTime: number = 0;
@@ -45,7 +54,14 @@ export class Game {
   hotbarElement: HTMLElement | null = null;
 
   constructor() {
+    this.settings = {
+      ...DEFAULT_WORLD_SETTINGS,
+      seed: this.seed,
+      renderRadius: loadRenderRadius(DEFAULT_WORLD_SETTINGS.renderRadius),
+    };
+
     this.renderer = new Renderer();
+    this.renderer.setRenderDistance(this.settings.renderRadius * CHUNK_SIZE);
     this.input = new Input(this.renderer.camera, this.renderer.canvas);
     this.world = new World();
     this.player = new Player(
@@ -83,7 +99,7 @@ export class Game {
       this.renderer.scene,
       this.mesherWorker,
       this.worldgenWorker,
-      this.seed,
+      this.settings,
       (key, meshData) => this.onMeshReady({ chunkKey: key, meshData }),
     );
 
@@ -93,9 +109,34 @@ export class Game {
       this.player.position.y,
       this.player.position.z,
     );
-    
+
     // Initialize hotbar UI
     this.initHotbar();
+
+    // Initialize settings UI (render distance slider)
+    this.initSettings();
+  }
+
+  private initSettings() {
+    const slider = document.getElementById(
+      "render-distance",
+    ) as HTMLInputElement | null;
+    const valueLabel = document.getElementById("render-distance-value");
+    if (!slider) return;
+
+    slider.min = String(RENDER_RADIUS_MIN);
+    slider.max = String(RENDER_RADIUS_MAX);
+    slider.value = String(this.settings.renderRadius);
+    if (valueLabel) valueLabel.textContent = String(this.settings.renderRadius);
+
+    slider.addEventListener("input", () => {
+      const radius = parseInt(slider.value, 10);
+      // Mutating the shared settings object updates ChunkManager next tick.
+      this.settings.renderRadius = radius;
+      if (valueLabel) valueLabel.textContent = String(radius);
+      saveRenderRadius(radius);
+      this.renderer.setRenderDistance(radius * CHUNK_SIZE);
+    });
   }
 
   private onWorldgenComplete(response: WorldgenWorkerResponse) {
