@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateChunkTerrain } from "../terrain";
+import { generateChunk } from "../ChunkGenerator";
 import { hash3, rand01, randInt } from "../random";
 import { makeNoise, FIELD } from "../noise";
 import {
@@ -23,26 +23,26 @@ function checksum(arr: Uint16Array): number {
   return h >>> 0;
 }
 
-describe("generateChunkTerrain determinism", () => {
+describe("generateChunk determinism", () => {
   it("produces an identical buffer for the same seed and coords", () => {
-    const a = generateChunkTerrain(0, 0, 0, SEED);
-    const b = generateChunkTerrain(0, 0, 0, SEED);
+    const a = generateChunk(0, 0, 0, SEED);
+    const b = generateChunk(0, 0, 0, SEED);
     expect(a.length).toBe(CHUNK_VOLUME);
     expect(Array.from(a)).toEqual(Array.from(b));
   });
 
   it("is independent of generation order", () => {
-    const first = generateChunkTerrain(0, 0, 0, SEED);
+    const first = generateChunk(0, 0, 0, SEED);
     // Generate other chunks in between; the original must be unaffected.
-    generateChunkTerrain(5, 0, 5, SEED);
-    generateChunkTerrain(-3, 1, 2, SEED);
-    const again = generateChunkTerrain(0, 0, 0, SEED);
+    generateChunk(5, 0, 5, SEED);
+    generateChunk(-3, 1, 2, SEED);
+    const again = generateChunk(0, 0, 0, SEED);
     expect(checksum(again)).toBe(checksum(first));
   });
 
   it("differs between distinct chunk coordinates", () => {
-    const a = generateChunkTerrain(0, 0, 0, SEED);
-    const b = generateChunkTerrain(10, 0, 10, SEED);
+    const a = generateChunk(0, 0, 0, SEED);
+    const b = generateChunk(10, 0, 10, SEED);
     expect(checksum(a)).not.toBe(checksum(b));
   });
 
@@ -50,9 +50,9 @@ describe("generateChunkTerrain determinism", () => {
   // the snapshot intentionally (e.g. the M3 alea->hash swap).
   it("matches the committed output snapshot", () => {
     expect({
-      "0,0,0": checksum(generateChunkTerrain(0, 0, 0, SEED)),
-      "0,1,0": checksum(generateChunkTerrain(0, 1, 0, SEED)),
-      "-3,0,7": checksum(generateChunkTerrain(-3, 0, 7, SEED)),
+      "0,0,0": checksum(generateChunk(0, 0, 0, SEED)),
+      "0,1,0": checksum(generateChunk(0, 1, 0, SEED)),
+      "-3,0,7": checksum(generateChunk(-3, 0, 7, SEED)),
     }).toMatchSnapshot();
   });
 });

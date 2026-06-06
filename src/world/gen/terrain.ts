@@ -1,5 +1,11 @@
-import SimplexNoise from "simplex-noise";
-import alea from "alea";
+// Stage A — base terrain shape.
+//
+// Produces the heightmapped surface (grass/dirt/stone) plus "stone-heavy
+// mountain" clusters and rare exposed-stone patches. The heightmap is driven by
+// the shared noise sampler at the same frequencies as before; all per-column
+// and per-block randomness is derived deterministically from the seed and world
+// coordinates via the hash helpers (replacing per-block PRNG allocation).
+
 import {
   CHUNK_SIZE,
   BLOCK_AIR,
@@ -7,164 +13,174 @@ import {
   BLOCK_DIRT,
   BLOCK_STONE,
 } from "../constants";
+import { FIELD } from "./noise";
+import { rand01, randInt } from "./random";
+import { localIndex } from "./coords";
+import type { GenContext } from "./types";
 
-export function generateChunkTerrain(
+// Each independent random decision draws from its own hash stream (distinct
+// salt) so decisions for the same column/block don't collide.
+const SALT_STONE_HEAVY = 1;
+const SALT_STONE_PCT = 2;
+const SALT_SPREAD_CHANCE = 3;
+const SALT_SPREAD_PCT = 4;
+const SALT_BLOCK_STONE = 5;
+
+export function generateTerrainShape(
+  ctx: GenContext,
   cx: number,
   cy: number,
   cz: number,
-  seed: number,
-): Uint16Array {
-  const prng = alea(seed.toString());
-  const noise = new SimplexNoise(prng);
-  const blocks = new Uint16Array(CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE);
-  
-  // First pass: identify stone-heavy columns and their properties
-  // Store both original stone-heavy columns and spread stone columns separately
-  const stoneHeavyData: Map<string, { percentage: number; height: number; isOriginal: boolean }> = new Map();
+  blocks: Uint16Array,
+): void {
+  const { seed, noise } = ctx;
+
+  // First pass: identify original stone-heavy columns (and their stone %).
+  const stoneHeavyData: Map<
+    string,
+    { percentage: number; height: number; isOriginal: boolean }
+  > = new Map();
   const spreadStoneData: Map<string, { percentage: number }> = new Map();
-  
+
   for (let lz = 0; lz < CHUNK_SIZE; lz++) {
     for (let lx = 0; lx < CHUNK_SIZE; lx++) {
       const worldX = cx * CHUNK_SIZE + lx;
       const worldZ = cz * CHUNK_SIZE + lz;
 
-      // Regional variation - determines how mountainous an area is (low frequency)
-      const regionNoise = noise.noise2D(worldX * 0.008, worldZ * 0.008);
+      // Regional variation - how mountainous an area is (low frequency).
+      const regionNoise = noise.fbm2D(worldX, worldZ, FIELD.REGION);
       const mountainFactor = (regionNoise + 1) * 0.5; // 0 to 1
-      
-      // Base terrain noise
-      const noiseValue = noise.noise2D(worldX * 0.03, worldZ * 0.03);
-      
-      // Amplitude varies by region: flat areas = 2, mountainous = 8
+
+      // Base terrain noise.
+      const noiseValue = noise.fbm2D(worldX, worldZ, FIELD.TERRAIN);
+
+      // Amplitude varies by region: flat areas = 2, mountainous = 8.
       const amplitude = 2 + mountainFactor * 6;
       const height = Math.floor(12 + noiseValue * amplitude);
 
-      // Check if this is high terrain
       const isHighTerrain = height > 15;
-      
-      // 1 in 20 chance that high terrain is 80-95% stone (stone-heavy mountains)
-      const columnSeed = worldX * 7919 + worldZ * 9973;
-      const columnRng = alea(seed.toString() + columnSeed.toString());
-      const isStoneHeavyMountain = isHighTerrain && Math.floor(columnRng() * 20) === 0;
-      
-      // Store stone-heavy column data (mark as original)
+
+      // 1 in 20 chance that high terrain is 80-95% stone (stone-heavy mountains).
+      const isStoneHeavyMountain =
+        isHighTerrain &&
+        randInt(seed, worldX, worldZ, 0, 20, SALT_STONE_HEAVY) === 0;
+
       if (isStoneHeavyMountain) {
-        const stonePercentage = 0.80 + columnRng() * 0.15; // Random between 0.80 and 0.95
-        stoneHeavyData.set(`${lx},${lz}`, { percentage: stonePercentage, height, isOriginal: true });
+        const stonePercentage =
+          0.8 + rand01(seed, worldX, worldZ, 0, SALT_STONE_PCT) * 0.15; // 0.80-0.95
+        stoneHeavyData.set(`${lx},${lz}`, {
+          percentage: stonePercentage,
+          height,
+          isOriginal: true,
+        });
       }
     }
   }
 
-  // Second pass: generate blocks with horizontal stone spreading
+  // Second pass: generate blocks with horizontal stone spreading.
   for (let lz = 0; lz < CHUNK_SIZE; lz++) {
     for (let lx = 0; lx < CHUNK_SIZE; lx++) {
       const worldX = cx * CHUNK_SIZE + lx;
       const worldZ = cz * CHUNK_SIZE + lz;
 
-      // Regional variation - determines how mountainous an area is (low frequency)
-      const regionNoise = noise.noise2D(worldX * 0.008, worldZ * 0.008);
-      const mountainFactor = (regionNoise + 1) * 0.5; // 0 to 1
-      
-      // Base terrain noise
-      const noiseValue = noise.noise2D(worldX * 0.03, worldZ * 0.03);
-      
-      // Amplitude varies by region: flat areas = 2, mountainous = 8
+      const regionNoise = noise.fbm2D(worldX, worldZ, FIELD.REGION);
+      const mountainFactor = (regionNoise + 1) * 0.5;
+
+      const noiseValue = noise.fbm2D(worldX, worldZ, FIELD.TERRAIN);
       const amplitude = 2 + mountainFactor * 6;
       const height = Math.floor(12 + noiseValue * amplitude);
 
-      // Use noise to create larger stone patches (lower frequency = larger patches)
-      const stonePatchNoise = noise.noise2D(worldX * 0.04, worldZ * 0.04);
+      // Larger stone patches (lower frequency = larger patches).
+      const stonePatchNoise = noise.fbm2D(worldX, worldZ, FIELD.STONE_PATCH);
       const stonePatchValue = (stonePatchNoise + 1) * 0.5; // 0 to 1
-      
-      // Check if this column is original stone-heavy
+
+      // Is this column an original stone-heavy column?
       const currentKey = `${lx},${lz}`;
       const stoneHeavyInfo = stoneHeavyData.get(currentKey);
       const isStoneHeavyMountain = !!stoneHeavyInfo && stoneHeavyInfo.isOriginal;
       let stonePercentage = stoneHeavyInfo?.percentage || 0;
-      
-      // Check if this column already has spread stone (cannot spread further)
+
+      // Already-spread stone cannot spread further.
       const spreadInfo = spreadStoneData.get(currentKey);
       if (spreadInfo) {
         stonePercentage = spreadInfo.percentage;
       }
-      
-      // Check if neighboring columns are ORIGINAL stone-heavy (for horizontal spreading)
-      // Only original stone-heavy columns can spread - spread stone cannot spread further
+
+      // Only ORIGINAL stone-heavy neighbours can spread stone into this column.
       const neighbors: Array<[number, number]> = [
-        [lx - 1, lz], [lx + 1, lz], // East/West
-        [lx, lz - 1], [lx, lz + 1], // North/South
+        [lx - 1, lz],
+        [lx + 1, lz],
+        [lx, lz - 1],
+        [lx, lz + 1],
       ];
-      
+
       let hasOriginalStoneHeavyNeighbor = false;
       let neighborStonePercentage = 0;
-      
+
       for (const [nx, nz] of neighbors) {
         if (nx >= 0 && nx < CHUNK_SIZE && nz >= 0 && nz < CHUNK_SIZE) {
-          const neighborKey = `${nx},${nz}`;
-          const neighborInfo = stoneHeavyData.get(neighborKey);
-          // Only spread from original stone-heavy columns, not from already-spread stone
+          const neighborInfo = stoneHeavyData.get(`${nx},${nz}`);
           if (neighborInfo && neighborInfo.isOriginal) {
             hasOriginalStoneHeavyNeighbor = true;
             neighborStonePercentage = neighborInfo.percentage;
-            break; // Use first found neighbor
+            break; // Use first found neighbour.
           }
         }
       }
-      
-      // If this column has an ORIGINAL stone-heavy neighbor, allow stone to spread
-      // Only spread once - spread stone cannot spread further (keeps clusters tight)
-      if (hasOriginalStoneHeavyNeighbor && !isStoneHeavyMountain && !spreadInfo && height > 15) {
-        const spreadSeed = worldX * 7919 + worldZ * 9973;
-        const spreadRng = alea(seed.toString() + spreadSeed.toString());
-        const spreadChance = spreadRng();
-        
-        // Reduced chance (10% instead of 15%) to keep spread very close to cluster
-        if (spreadChance < 0.10) {
-          // Use 40-60% of the neighbor's stone percentage for spreading
-          const spreadPercentage = neighborStonePercentage * (0.40 + spreadRng() * 0.20);
+
+      // Spread once only (keeps clusters tight); spread stone can't spread further.
+      if (
+        hasOriginalStoneHeavyNeighbor &&
+        !isStoneHeavyMountain &&
+        !spreadInfo &&
+        height > 15
+      ) {
+        const spreadChance = rand01(seed, worldX, worldZ, 0, SALT_SPREAD_CHANCE);
+        // 10% chance to keep spread very close to the cluster.
+        if (spreadChance < 0.1) {
+          // 40-60% of the neighbour's stone percentage.
+          const spreadPercentage =
+            neighborStonePercentage *
+            (0.4 + rand01(seed, worldX, worldZ, 0, SALT_SPREAD_PCT) * 0.2);
           stonePercentage = spreadPercentage;
-          // Mark this as spread stone (cannot spread further)
           spreadStoneData.set(currentKey, { percentage: spreadPercentage });
         }
       }
-      
-      // Much rarer stone patches - only in very specific noise areas
+
+      // Much rarer exposed-stone patches in specific noise areas.
       const isHighTerrain = height > 15;
       const isRareStonePatch = stonePatchValue > 0.96 && isHighTerrain;
-      
-      // Low areas or steep slopes: even rarer, noise > 0.98
+
       const isLowArea = height < 10;
       const isSteepSlope = mountainFactor > 0.7;
-      const isRareLowStonePatch = stonePatchValue > 0.98 && (isLowArea || isSteepSlope);
-      
-      // Determine if this column should have stone exposed
+      const isRareLowStonePatch =
+        stonePatchValue > 0.98 && (isLowArea || isSteepSlope);
+
       const shouldExposeStone = isRareStonePatch || isRareLowStonePatch;
-      
-      // Check if this column has stone (either stone-heavy or spread from neighbor)
       const hasStoneContent = stonePercentage > 0;
 
       for (let ly = 0; ly < CHUNK_SIZE; ly++) {
         const worldY = cy * CHUNK_SIZE + ly;
-        const index = ly * CHUNK_SIZE * CHUNK_SIZE + lz * CHUNK_SIZE + lx;
+        const index = localIndex(lx, ly, lz);
 
         if (worldY > height) {
           blocks[index] = BLOCK_AIR;
         } else {
-          // For stone-heavy mountains or spread stone, determine if this block should be stone
+          // For stone-bearing columns, decide per block whether it is stone.
           let shouldBeStone = false;
-          
           if (hasStoneContent) {
-            // Use a random value per block position to determine if it should be stone
-            const blockSeed = worldX * 7919 + worldZ * 9973 + worldY * 3571;
-            const blockRng = alea(seed.toString() + blockSeed.toString());
-            const randomValue = blockRng();
-            
-            // Stone percentage applies to the entire column
+            const randomValue = rand01(
+              seed,
+              worldX,
+              worldY,
+              worldZ,
+              SALT_BLOCK_STONE,
+            );
             shouldBeStone = randomValue < stonePercentage;
           }
-          
+
           if (worldY === height) {
-            // Surface layer
+            // Surface layer.
             if (hasStoneContent && shouldBeStone) {
               blocks[index] = BLOCK_STONE;
             } else if (shouldExposeStone) {
@@ -173,7 +189,7 @@ export function generateChunkTerrain(
               blocks[index] = BLOCK_GRASS;
             }
           } else if (worldY >= height - 3) {
-            // Top 3 layers below surface (dirt layer)
+            // Top 3 dirt layers below the surface.
             if (hasStoneContent && shouldBeStone) {
               blocks[index] = BLOCK_STONE;
             } else if (shouldExposeStone) {
@@ -182,17 +198,11 @@ export function generateChunkTerrain(
               blocks[index] = BLOCK_DIRT;
             }
           } else {
-            // Deep underground
-            if (hasStoneContent && shouldBeStone) {
-              blocks[index] = BLOCK_STONE;
-            } else {
-              blocks[index] = BLOCK_STONE; // Always stone deep underground
-            }
+            // Deep underground is always stone.
+            blocks[index] = BLOCK_STONE;
           }
         }
       }
     }
   }
-
-  return blocks;
 }

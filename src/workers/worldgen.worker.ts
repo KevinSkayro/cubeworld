@@ -1,4 +1,4 @@
-import { generateChunkTerrain } from "../world/gen/terrain";
+import { generateChunk } from "../world/gen/ChunkGenerator";
 
 export interface WorldgenWorkerRequest {
   chunkKey: string;
@@ -17,7 +17,7 @@ self.onmessage = (event: MessageEvent<WorldgenWorkerRequest>) => {
   const { chunkKey, cx, cy, cz, seed } = event.data;
 
   // Generate terrain
-  const blocks = generateChunkTerrain(cx, cy, cz, seed);
+  const blocks = generateChunk(cx, cy, cz, seed);
 
   const response: WorldgenWorkerResponse = {
     chunkKey,
