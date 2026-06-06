@@ -23,11 +23,12 @@ export const RENDER_RADIUS_MAX = 10;
 export const DEFAULT_WORLD_SETTINGS: WorldSettings = {
   seed: 12345,
   renderRadius: 4,
-  // y 0..63 — covers terrain (~y10-20), build headroom above the old 32 cap,
-  // and room for future underground features. Kept modest for browser perf;
-  // the per-tick load budget smooths the cost of the extra layers.
+  // y 0..79 — surface sits ≈ y60 (see BASE_HEIGHT) with ~50-70 blocks of
+  // underground for caves/caverns and an ore depth gradient, plus build
+  // headroom above the surface. The per-tick load budget smooths the cost of
+  // the extra layer; lower this (or render distance) on weak machines.
   minChunkY: 0,
-  maxChunkY: 3,
+  maxChunkY: 4,
   chunkLoadBudget: 8,
 };
 

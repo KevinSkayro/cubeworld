@@ -27,20 +27,47 @@ const SALT_SPREAD_CHANCE = 3;
 const SALT_SPREAD_PCT = 4;
 const SALT_BLOCK_STONE = 5;
 
+// Base surface height (≈ sea level). Higher than the old shallow value of 12 so
+// there is a deep underground for caves and an ore depth gradient. Exported so
+// caves/ores can reason about depth.
+export const BASE_HEIGHT = 60;
+
+// Terrain ruggedness. Most of the world is gentle (FLAT_AMPLITUDE); rugged
+// mountains only ramp in where the low-frequency region noise is high, gated by
+// a smoothstep so they stay confined to a minority of the map with smooth
+// foothill transitions. Mountain peaks stay under the render ceiling (~y79).
+const FLAT_AMPLITUDE = 2;
+const MOUNTAIN_AMPLITUDE = 16;
+const MOUNTAIN_START = 0.55; // region values below this are fully flat
+const MOUNTAIN_FULL = 0.85; // region values at/above this are full mountains
+
+// Surface stone (stone-heavy clusters + exposed patches) only appears on
+// genuinely elevated/rocky terrain — not flat grassland. Relative to
+// BASE_HEIGHT so it tracks the actual terrain, not a stale absolute y.
+const HILL_HEIGHT = BASE_HEIGHT + 6;
+
+function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
 /**
  * Terrain surface height for a world column. Single source of truth shared by
- * the terrain stage and the surface pass. Amplitude scales with a low-frequency
- * "mountain factor" so some regions are flat and others rugged.
+ * the terrain stage and the surface pass. The region noise selects ruggedness:
+ * flat (gentle rolling) almost everywhere, ramping to rugged mountains only in
+ * the rare high-region areas. Heights land ≈ y44–76 (under the render ceiling).
  */
 export function columnHeight(
   noise: NoiseSampler,
   worldX: number,
   worldZ: number,
 ): number {
-  const mountainFactor = (noise.fbm2D(worldX, worldZ, FIELD.REGION) + 1) * 0.5;
+  const region = (noise.fbm2D(worldX, worldZ, FIELD.REGION) + 1) * 0.5; // 0..1
+  const mountainFactor = smoothstep(MOUNTAIN_START, MOUNTAIN_FULL, region);
+  const amplitude =
+    FLAT_AMPLITUDE + mountainFactor * (MOUNTAIN_AMPLITUDE - FLAT_AMPLITUDE);
   const noiseValue = noise.fbm2D(worldX, worldZ, FIELD.TERRAIN);
-  const amplitude = 2 + mountainFactor * 6;
-  return Math.floor(12 + noiseValue * amplitude);
+  return Math.floor(BASE_HEIGHT + noiseValue * amplitude);
 }
 
 export function generateTerrainShape(
@@ -65,11 +92,11 @@ export function generateTerrainShape(
       const worldZ = cz * CHUNK_SIZE + lz;
 
       const height = columnHeight(noise, worldX, worldZ);
-      const isHighTerrain = height > 15;
+      const isElevated = height > HILL_HEIGHT;
 
-      // 1 in 20 chance that high terrain is 80-95% stone (stone-heavy mountains).
+      // 1 in 20 chance that elevated terrain is 80-95% stone (stone-heavy mountains).
       const isStoneHeavyMountain =
-        isHighTerrain &&
+        isElevated &&
         randInt(seed, worldX, worldZ, 0, 20, SALT_STONE_HEAVY) === 0;
 
       if (isStoneHeavyMountain) {
@@ -136,7 +163,7 @@ export function generateTerrainShape(
         hasOriginalStoneHeavyNeighbor &&
         !isStoneHeavyMountain &&
         !spreadInfo &&
-        height > 15
+        height > HILL_HEIGHT
       ) {
         const spreadChance = rand01(seed, worldX, worldZ, 0, SALT_SPREAD_CHANCE);
         // 10% chance to keep spread very close to the cluster.
@@ -150,14 +177,12 @@ export function generateTerrainShape(
         }
       }
 
-      // Much rarer exposed-stone patches in specific noise areas.
-      const isHighTerrain = height > 15;
-      const isRareStonePatch = stonePatchValue > 0.96 && isHighTerrain;
+      // Much rarer exposed-stone patches, only on elevated/steep terrain.
+      const isElevated = height > HILL_HEIGHT;
+      const isRareStonePatch = stonePatchValue > 0.96 && isElevated;
 
-      const isLowArea = height < 10;
       const isSteepSlope = mountainFactor > 0.7;
-      const isRareLowStonePatch =
-        stonePatchValue > 0.98 && (isLowArea || isSteepSlope);
+      const isRareLowStonePatch = stonePatchValue > 0.98 && isSteepSlope;
 
       const shouldExposeStone = isRareStonePatch || isRareLowStonePatch;
       const hasStoneContent = stonePercentage > 0;

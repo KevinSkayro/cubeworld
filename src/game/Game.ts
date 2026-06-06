@@ -17,6 +17,7 @@ import {
   saveRenderRadius,
 } from "../world/gen/settings";
 import { makeNoise, NoiseSampler } from "../world/gen/noise";
+import { columnHeight } from "../world/gen/terrain";
 import { BiomeOverlay } from "../debug/BiomeOverlay";
 
 interface WorldgenWorkerResponse {
@@ -75,6 +76,18 @@ export class Game {
       (x, y, z) => this.world.getBlock(x, y, z),
     );
 
+    // Spawn the player just above the actual terrain surface at the spawn
+    // column (terrain is now deep, so a fixed Y would start inside the ground).
+    this.biomeNoise = makeNoise(this.settings.seed);
+    const spawnX = this.player.position.x;
+    const spawnZ = this.player.position.z;
+    const spawnHeight = columnHeight(
+      this.biomeNoise,
+      Math.floor(spawnX),
+      Math.floor(spawnZ),
+    );
+    this.player.position.set(spawnX, spawnHeight + 3, spawnZ);
+
     // Create texture atlas and material
     this.textureAtlas = new TextureAtlas();
     this.chunkMaterial = new THREE.MeshPhongMaterial({
@@ -121,7 +134,6 @@ export class Game {
     this.initSettings();
 
     // Debug: biome parameter visualizer (toggle with 'B')
-    this.biomeNoise = makeNoise(this.settings.seed);
     this.biomeOverlay = new BiomeOverlay();
   }
 
