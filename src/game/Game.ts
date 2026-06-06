@@ -16,6 +16,8 @@ import {
   loadRenderRadius,
   saveRenderRadius,
 } from "../world/gen/settings";
+import { makeNoise, NoiseSampler } from "../world/gen/noise";
+import { BiomeOverlay } from "../debug/BiomeOverlay";
 
 interface WorldgenWorkerResponse {
   chunkKey: string;
@@ -32,6 +34,8 @@ export class Game {
   worldgenWorker: Worker;
   seed: number = 12345;
   settings: WorldSettings;
+  biomeNoise: NoiseSampler;
+  biomeOverlay: BiomeOverlay;
   running: boolean = false;
   mineTargetKey: string | null = null;
   mineStartTime: number = 0;
@@ -115,6 +119,10 @@ export class Game {
 
     // Initialize settings UI (render distance slider)
     this.initSettings();
+
+    // Debug: biome parameter visualizer (toggle with 'B')
+    this.biomeNoise = makeNoise(this.settings.seed);
+    this.biomeOverlay = new BiomeOverlay();
   }
 
   private initSettings() {
@@ -175,6 +183,12 @@ export class Game {
     if (this.input.consumeKeyPress("c")) {
       this.thirdPerson = !this.thirdPerson;
       this.player.setThirdPerson(this.thirdPerson);
+    }
+  }
+
+  private handleDebugToggles() {
+    if (this.input.consumeKeyPress("b")) {
+      this.biomeOverlay.toggle();
     }
   }
   
@@ -376,11 +390,17 @@ export class Game {
   gameLoop = () => {
     this.player.update();
     this.handlePerspectiveToggle();
+    this.handleDebugToggles();
     this.handleBlockSelection();
     this.handleBlockInteraction();
     this.chunkManager.update(
       this.player.position.x,
       this.player.position.y,
+      this.player.position.z,
+    );
+    this.biomeOverlay.update(
+      this.biomeNoise,
+      this.player.position.x,
       this.player.position.z,
     );
     this.renderer.render();
