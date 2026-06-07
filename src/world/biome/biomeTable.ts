@@ -20,6 +20,8 @@ export interface BiomeDef {
   fillerBlock: number;
   /** RGB the debug overlay uses to colour this biome's region. */
   debugColor: readonly [number, number, number];
+  /** Per-cell probability a tree spawns in this biome (0 = none). */
+  treeDensity: number;
 }
 
 export const BIOMES: Record<BiomeId, BiomeDef> = {
@@ -29,6 +31,7 @@ export const BIOMES: Record<BiomeId, BiomeDef> = {
     surfaceBlock: BLOCK_GRASS,
     fillerBlock: BLOCK_DIRT,
     debugColor: [80, 160, 60],
+    treeDensity: 0.4,
   },
   desert: {
     id: "desert",
@@ -36,6 +39,7 @@ export const BIOMES: Record<BiomeId, BiomeDef> = {
     surfaceBlock: BLOCK_SAND,
     fillerBlock: BLOCK_SAND,
     debugColor: [222, 205, 128],
+    treeDensity: 0,
   },
   snowy: {
     id: "snowy",
@@ -43,6 +47,7 @@ export const BIOMES: Record<BiomeId, BiomeDef> = {
     surfaceBlock: BLOCK_SNOW,
     fillerBlock: BLOCK_DIRT,
     debugColor: [236, 238, 245],
+    treeDensity: 0.25,
   },
 };
 

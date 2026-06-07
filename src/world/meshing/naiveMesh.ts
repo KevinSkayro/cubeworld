@@ -152,7 +152,12 @@ export function naiveMesh(chunk: Chunk, registry: BlockRegistry): MeshData {
             shouldCreateFace = true;
           } else {
             const neighborId = chunk.getBlock(nx, ny, nz);
-            if (!registry.isSolid(neighborId)) {
+            // Render the face unless the neighbour fully occludes it. A
+            // non-opaque neighbour (air or a cutout block like leaves) doesn't
+            // occlude, so a trunk shows through surrounding leaves and leaf
+            // blocks render every face — including leaf-against-leaf — for a
+            // denser-looking canopy.
+            if (!registry.isOpaque(neighborId)) {
               shouldCreateFace = true;
             }
           }

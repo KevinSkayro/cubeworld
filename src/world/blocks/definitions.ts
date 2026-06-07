@@ -13,6 +13,9 @@ export interface BlockDef {
   name: string;
   solid: boolean;
   textureConfig: TextureConfig;
+  /** Whether the block fully occludes neighbours. Default true; set false for
+   *  cutout blocks (e.g. leaves) so adjacent faces still render through them. */
+  opaque?: boolean;
 }
 
 // Block definitions - single source of truth
@@ -66,6 +69,19 @@ export const BLOCK_DEFINITIONS: BlockDef[] = [
     solid: true,
     textureConfig: { type: "uniform", texture: TEX.IRON_ORE },
   },
+  {
+    id: 8,
+    name: "Wood",
+    solid: true,
+    textureConfig: { type: "topSideBottom", top: TEX.TREE_TOP, side: TEX.TREE_SIDE, bottom: TEX.TREE_TOP },
+  },
+  {
+    id: 9,
+    name: "Leaves",
+    solid: true,
+    opaque: false, // cutout texture — neighbours render through the gaps
+    textureConfig: { type: "uniform", texture: TEX.LEAVES },
+  },
 ];
 
 // Export block constants for convenience
@@ -77,3 +93,5 @@ export const BLOCK_SAND = 4;
 export const BLOCK_SNOW = 5;
 export const BLOCK_COAL_ORE = 6;
 export const BLOCK_IRON_ORE = 7;
+export const BLOCK_WOOD = 8;
+export const BLOCK_LEAVES = 9;

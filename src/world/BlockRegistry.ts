@@ -14,6 +14,7 @@ export interface BlockDefinition {
   id: number;
   name: string;
   solid: boolean;
+  opaque: boolean;
   textures: BlockFaceTextures;
 }
 
@@ -52,6 +53,7 @@ export class BlockRegistry {
         id: def.id,
         name: def.name,
         solid: def.solid,
+        opaque: def.opaque !== false, // default true
         textures,
       });
     }
@@ -64,6 +66,12 @@ export class BlockRegistry {
   isSolid(id: number): boolean {
     const block = this.blocks.get(id);
     return block ? block.solid : false;
+  }
+
+  /** Whether the block fully occludes neighbours (solid and opaque). */
+  isOpaque(id: number): boolean {
+    const block = this.blocks.get(id);
+    return block ? block.solid && block.opaque : false;
   }
 
   getTextures(id: number): BlockFaceTextures | undefined {

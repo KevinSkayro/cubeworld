@@ -92,6 +92,9 @@ export class Game {
     this.textureAtlas = new TextureAtlas();
     this.chunkMaterial = new THREE.MeshPhongMaterial({
       map: this.textureAtlas.texture,
+      // Cut out transparent texels (leaf gaps) instead of showing the atlas
+      // background; opaque blocks (alpha 1) are unaffected.
+      alphaTest: 0.5,
     });
 
     // Create workers

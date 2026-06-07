@@ -14,4 +14,6 @@ export {
   BLOCK_SNOW,
   BLOCK_COAL_ORE,
   BLOCK_IRON_ORE,
+  BLOCK_WOOD,
+  BLOCK_LEAVES,
 } from "./blocks/definitions";

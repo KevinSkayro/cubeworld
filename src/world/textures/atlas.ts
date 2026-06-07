@@ -46,10 +46,10 @@ export class TextureAtlas {
     this.canvas.width = ATLAS_SIZE * TILE_SIZE;
     this.canvas.height = ATLAS_SIZE * TILE_SIZE;
     this.ctx = this.canvas.getContext("2d")!;
-    
-    // Fill with magenta for debugging missing textures
-    this.ctx.fillStyle = "#ff00ff";
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // Leave the atlas transparent so textures with alpha (e.g. leaves) keep
+    // their transparency; the chunk material uses alphaTest to cut those out.
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
     this.texture = new THREE.CanvasTexture(this.canvas);
     this.texture.magFilter = THREE.NearestFilter;
