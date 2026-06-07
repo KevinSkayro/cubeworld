@@ -1,33 +1,51 @@
 import { Game } from "./game/Game";
+import { Menu } from "./ui/Menu";
+import {
+  loadSeed,
+  saveSeed,
+  DEFAULT_WORLD_SETTINGS,
+} from "./world/gen/settings";
 
-// function createStartScreen(onStart: () => void) {
-//   const overlay = document.createElement("div");
-//   overlay.style.position = "fixed";
-//   overlay.style.inset = "0";
-//   overlay.style.display = "flex";
-//   overlay.style.alignItems = "center";
-//   overlay.style.justifyContent = "center";
-//   overlay.style.background = "rgba(0, 0, 0, 0.6)";
-//   overlay.style.zIndex = "1000";
+// One Game is created when the player first presses Play; the pause menu reuses
+// it (no mid-game seed change — that's chosen once on the start screen).
+let game: Game | null = null;
 
-//   const button = document.createElement("button");
-//   button.textContent = "Start Game";
-//   button.style.padding = "12px 24px";
-//   button.style.fontSize = "16px";
-//   button.style.cursor = "pointer";
+function showGameHud(visible: boolean) {
+  document.body.classList.toggle("playing", visible);
+}
 
-//   button.addEventListener("click", () => {
-//     overlay.remove();
-//     onStart();
-//   });
+const menu = new Menu({
+  onPlay(seed) {
+    saveSeed(seed);
+    if (!game) {
+      game = new Game(seed);
+      // Escape (pointer-lock release) re-opens the menu in pause mode.
+      game.onPause = () => {
+        showGameHud(false);
+        menu.showPause({ seed: game!.seed, autoSave: game!.isAutoSave() });
+      };
+      game.start();
+    }
+    menu.hide();
+    showGameHud(true);
+    game.setPaused(false);
+    game.requestPointerLock();
+  },
 
-//   overlay.appendChild(button);
-//   document.body.appendChild(overlay);
-// }
+  onResume() {
+    menu.hide();
+    showGameHud(true);
+    game?.setPaused(false);
+    game?.requestPointerLock();
+  },
 
-// createStartScreen(() => {
-//   const game = new Game();
-//   game.start();
-// });
-const game = new Game();
-game.start();
+  onSaveProgress() {
+    return game ? game.saveProgress() : 0;
+  },
+
+  onAutoSaveChange(enabled) {
+    game?.setAutoSave(enabled);
+  },
+});
+
+menu.showStart(loadSeed(DEFAULT_WORLD_SETTINGS.seed));

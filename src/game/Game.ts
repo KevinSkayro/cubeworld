@@ -15,6 +15,9 @@ import {
   RENDER_RADIUS_MAX,
   loadRenderRadius,
   saveRenderRadius,
+  loadSeed,
+  loadAutoSave,
+  saveAutoSave,
 } from "../world/gen/settings";
 import { makeNoise, NoiseSampler } from "../world/gen/noise";
 import { columnHeight } from "../world/gen/terrain";
@@ -41,6 +44,10 @@ export class Game {
   coordsOverlay: CoordsOverlay;
   settingsPanel: HTMLElement | null = null;
   running: boolean = false;
+  paused: boolean = false;
+  /** Called when the player releases pointer lock (e.g. Escape) so the host can
+   *  show the pause menu. */
+  onPause?: () => void;
   mineTargetKey: string | null = null;
   mineStartTime: number = 0;
   mineHoldMs: number = 500;
@@ -61,16 +68,19 @@ export class Game {
   ];
   hotbarElement: HTMLElement | null = null;
 
-  constructor() {
+  constructor(seed: number = loadSeed(DEFAULT_WORLD_SETTINGS.seed)) {
+    this.seed = seed;
     this.settings = {
       ...DEFAULT_WORLD_SETTINGS,
-      seed: this.seed,
+      seed,
       renderRadius: loadRenderRadius(DEFAULT_WORLD_SETTINGS.renderRadius),
     };
 
     this.renderer = new Renderer();
     this.renderer.setRenderDistance(this.settings.renderRadius * CHUNK_SIZE);
     this.input = new Input(this.renderer.camera, this.renderer.canvas);
+    // Releasing pointer lock (Escape / focus loss) opens the pause menu.
+    this.input.onUnlock = () => this.handlePointerUnlock();
     this.world = new World();
     this.player = new Player(
       this.renderer.camera,
@@ -125,6 +135,8 @@ export class Game {
       this.settings,
       (key, meshData) => this.onMeshReady({ chunkKey: key, meshData }),
     );
+    // Apply the persisted auto-save preference (off by default).
+    this.chunkManager.setAutoSave(loadAutoSave(false));
 
     // Load initial chunks around player spawn
     this.chunkManager.update(
@@ -143,6 +155,12 @@ export class Game {
     this.biomeOverlay = new BiomeOverlay();
     // Debug: coordinates readout (toggle with F3)
     this.coordsOverlay = new CoordsOverlay();
+
+    // Best-effort flush of pending edited-chunk saves when the tab is hidden or
+    // closing, so an edit made moments before leaving still persists.
+    window.addEventListener("pagehide", () => {
+      void this.chunkManager.flushSaves();
+    });
   }
 
   private initSettings() {
@@ -198,6 +216,40 @@ export class Game {
   start() {
     this.running = true;
     this.gameLoop();
+  }
+
+  /** Freeze/resume the simulation (the render loop keeps running). */
+  setPaused(paused: boolean) {
+    this.paused = paused;
+  }
+
+  /** Request pointer lock (call from a user gesture, e.g. a menu button). */
+  requestPointerLock() {
+    this.input.controls.lock();
+  }
+
+  private handlePointerUnlock() {
+    // Ignore if not actively playing or already paused (avoids re-firing).
+    if (!this.running || this.paused) return;
+    this.paused = true;
+    this.onPause?.();
+  }
+
+  /** Persist all unsaved edits; resolves with the number of chunks written. */
+  async saveProgress(): Promise<number> {
+    const count = this.chunkManager.saveAll();
+    await this.chunkManager.flushSaves();
+    return count;
+  }
+
+  /** Toggle auto-save and remember the choice. */
+  setAutoSave(enabled: boolean) {
+    this.chunkManager.setAutoSave(enabled);
+    saveAutoSave(enabled);
+  }
+
+  isAutoSave(): boolean {
+    return this.chunkManager.isAutoSaveEnabled();
   }
 
   private handlePerspectiveToggle() {
@@ -329,6 +381,7 @@ export class Game {
       const elapsed = performance.now() - this.mineStartTime;
       if (elapsed >= this.mineHoldMs) {
         this.world.setBlock(hit.blockX, hit.blockY, hit.blockZ, BLOCK_AIR);
+        this.markEditedAt(hit.blockX, hit.blockY, hit.blockZ);
         this.remeshAffectedChunks(hit.blockX, hit.blockY, hit.blockZ);
         this.mineTargetKey = null;
         this.mineStartTime = 0;
@@ -355,6 +408,7 @@ export class Game {
         // Check if placing this block would collide with the player
         if (!this.wouldBlockCollideWithPlayer(placeX, placeY, placeZ)) {
           this.world.setBlock(placeX, placeY, placeZ, this.selectedBlockType);
+          this.markEditedAt(placeX, placeY, placeZ);
           this.remeshAffectedChunks(placeX, placeY, placeZ);
           this.lastPlaceTime = now;
         }
@@ -391,6 +445,14 @@ export class Game {
     return overlapX && overlapY && overlapZ;
   }
 
+  /** Flag (and persist) the chunk that owns an edited block. */
+  private markEditedAt(blockX: number, blockY: number, blockZ: number) {
+    const cx = Math.floor(blockX / CHUNK_SIZE);
+    const cy = Math.floor(blockY / CHUNK_SIZE);
+    const cz = Math.floor(blockZ / CHUNK_SIZE);
+    this.chunkManager.markEdited(`${cx},${cy},${cz}`);
+  }
+
   private remeshAffectedChunks(blockX: number, blockY: number, blockZ: number) {
     const chunkX = Math.floor(blockX / CHUNK_SIZE);
     const chunkY = Math.floor(blockY / CHUNK_SIZE);
@@ -419,26 +481,29 @@ export class Game {
   }
 
   gameLoop = () => {
-    this.player.update();
-    this.handlePerspectiveToggle();
-    this.handleDebugToggles();
-    this.handleBlockSelection();
-    this.handleBlockInteraction();
-    this.chunkManager.update(
-      this.player.position.x,
-      this.player.position.y,
-      this.player.position.z,
-    );
-    this.biomeOverlay.update(
-      this.biomeNoise,
-      this.player.position.x,
-      this.player.position.z,
-    );
-    this.coordsOverlay.update(
-      this.player.position.x,
-      this.player.position.y,
-      this.player.position.z,
-    );
+    // Freeze the simulation while paused (menu open); keep rendering the frame.
+    if (!this.paused) {
+      this.player.update();
+      this.handlePerspectiveToggle();
+      this.handleDebugToggles();
+      this.handleBlockSelection();
+      this.handleBlockInteraction();
+      this.chunkManager.update(
+        this.player.position.x,
+        this.player.position.y,
+        this.player.position.z,
+      );
+      this.biomeOverlay.update(
+        this.biomeNoise,
+        this.player.position.x,
+        this.player.position.z,
+      );
+      this.coordsOverlay.update(
+        this.player.position.x,
+        this.player.position.y,
+        this.player.position.z,
+      );
+    }
     this.renderer.render();
     requestAnimationFrame(this.gameLoop);
   };

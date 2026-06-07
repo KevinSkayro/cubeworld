@@ -5,6 +5,9 @@ export class Chunk {
   y: number;
   z: number;
   blocks: Uint16Array;
+  /** True once the player has modified this chunk. Edited chunks are persisted
+   *  and restored verbatim; unedited chunks are regenerated on demand. */
+  edited: boolean = false;
 
   constructor(x: number, y: number, z: number) {
     this.x = x;

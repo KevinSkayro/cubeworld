@@ -106,6 +106,120 @@
         width: 160px;
         vertical-align: middle;
       }
+
+      /* In-game HUD is hidden until the player is actually playing. */
+      .crosshair,
+      .hotbar,
+      .settings-panel {
+        display: none;
+      }
+      body.playing .crosshair {
+        display: block;
+      }
+      body.playing .hotbar {
+        display: flex;
+      }
+      body.playing .settings-panel {
+        display: block;
+      }
+
+      /* Menu (start + pause), styled to match the in-game panels. */
+      .menu-overlay {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 2000;
+      }
+      .menu-overlay.visible {
+        display: flex;
+      }
+      .menu-card {
+        min-width: 280px;
+        padding: 24px;
+        background: rgba(0, 0, 0, 0.75);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        color: white;
+        font-family: Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      }
+      .menu-title {
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        text-align: center;
+        margin-bottom: 2px;
+      }
+      .menu-row {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 13px;
+      }
+      .menu-row.inline {
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+      }
+      .menu-card input[type="text"] {
+        padding: 8px 10px;
+        background: rgba(0, 0, 0, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 6px;
+        color: white;
+        font: 14px monospace;
+      }
+      .menu-card input[type="text"]:focus {
+        outline: none;
+        border-color: rgba(255, 255, 255, 0.6);
+      }
+      .menu-btn {
+        padding: 9px 14px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 6px;
+        color: white;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background 0.12s, border-color 0.12s;
+      }
+      .menu-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+        border-color: rgba(255, 255, 255, 0.55);
+      }
+      .menu-btn.primary {
+        background: rgba(80, 160, 60, 0.35);
+        border-color: rgba(120, 200, 100, 0.6);
+        font-weight: 700;
+      }
+      .menu-btn.primary:hover {
+        background: rgba(80, 160, 60, 0.55);
+      }
+      .menu-seed-line {
+        font: 12px monospace;
+        color: rgba(255, 255, 255, 0.7);
+        text-align: center;
+      }
+      .menu-toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        cursor: pointer;
+        user-select: none;
+      }
+      .menu-status {
+        min-height: 16px;
+        font-size: 12px;
+        color: rgba(150, 220, 140, 0.95);
+        text-align: center;
+      }
     </style>
   </head>
   <body>
