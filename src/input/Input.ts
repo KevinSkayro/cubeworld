@@ -27,6 +27,8 @@ export class Input {
     });
 
     document.addEventListener("keydown", (e) => {
+      // F3 is the browser's "find next" shortcut; claim it for the debug HUD.
+      if (e.key === "F3") e.preventDefault();
       this.keys[e.key.toLowerCase()] = true;
       this.keyPresses[e.key.toLowerCase()] = true;
     });

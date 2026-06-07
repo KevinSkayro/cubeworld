@@ -19,6 +19,7 @@ import {
 import { makeNoise, NoiseSampler } from "../world/gen/noise";
 import { columnHeight } from "../world/gen/terrain";
 import { BiomeOverlay } from "../debug/BiomeOverlay";
+import { CoordsOverlay } from "../debug/CoordsOverlay";
 
 interface WorldgenWorkerResponse {
   chunkKey: string;
@@ -37,6 +38,8 @@ export class Game {
   settings: WorldSettings;
   biomeNoise: NoiseSampler;
   biomeOverlay: BiomeOverlay;
+  coordsOverlay: CoordsOverlay;
+  settingsPanel: HTMLElement | null = null;
   running: boolean = false;
   mineTargetKey: string | null = null;
   mineStartTime: number = 0;
@@ -138,9 +141,12 @@ export class Game {
 
     // Debug: biome parameter visualizer (toggle with 'B')
     this.biomeOverlay = new BiomeOverlay();
+    // Debug: coordinates readout (toggle with F3)
+    this.coordsOverlay = new CoordsOverlay();
   }
 
   private initSettings() {
+    this.settingsPanel = document.getElementById("settings-panel");
     const slider = document.getElementById(
       "render-distance",
     ) as HTMLInputElement | null;
@@ -204,6 +210,16 @@ export class Game {
   private handleDebugToggles() {
     if (this.input.consumeKeyPress("b")) {
       this.biomeOverlay.toggle();
+    }
+    if (this.input.consumeKeyPress("f3")) {
+      this.coordsOverlay.toggle();
+      // The coords HUD shares the top-left corner with the render-distance
+      // panel; hide the panel while the HUD is up so they don't overlap.
+      if (this.settingsPanel) {
+        this.settingsPanel.style.display = this.coordsOverlay.visible
+          ? "none"
+          : "";
+      }
     }
   }
   
@@ -416,6 +432,11 @@ export class Game {
     this.biomeOverlay.update(
       this.biomeNoise,
       this.player.position.x,
+      this.player.position.z,
+    );
+    this.coordsOverlay.update(
+      this.player.position.x,
+      this.player.position.y,
       this.player.position.z,
     );
     this.renderer.render();

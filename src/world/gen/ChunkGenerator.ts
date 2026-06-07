@@ -13,6 +13,7 @@ import { applySurfacePass } from "./surface";
 import { placeOres } from "./ores";
 import { carveCaves } from "./caves";
 import { decorate } from "./decorations";
+import { placeStructures } from "./structures";
 
 export class ChunkGenerator {
   readonly ctx: GenContext;
@@ -21,14 +22,16 @@ export class ChunkGenerator {
   constructor(seed: number) {
     this.ctx = { seed, noise: makeNoise(seed) };
     // Ordered generation pipeline. Ores are placed before caves so cave
-    // carving exposes veins in cave walls; decorations run last so trees sit on
-    // the final surface.
+    // carving exposes veins in cave walls; decorations run after caves so trees
+    // sit on the final surface; structures run last so caves don't carve them
+    // and they overwrite any vegetation in their footprint.
     this.stages = [
       generateTerrainShape,
       applySurfacePass,
       placeOres,
       carveCaves,
       decorate,
+      placeStructures,
     ];
   }
 
