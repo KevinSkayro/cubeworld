@@ -42,7 +42,6 @@ export class Game {
   biomeNoise: NoiseSampler;
   biomeOverlay: BiomeOverlay;
   coordsOverlay: CoordsOverlay;
-  settingsPanel: HTMLElement | null = null;
   running: boolean = false;
   paused: boolean = false;
   /** Called when the player releases pointer lock (e.g. Escape) so the host can
@@ -148,9 +147,6 @@ export class Game {
     // Initialize hotbar UI
     this.initHotbar();
 
-    // Initialize settings UI (render distance slider)
-    this.initSettings();
-
     // Debug: biome parameter visualizer (toggle with 'B')
     this.biomeOverlay = new BiomeOverlay();
     // Debug: coordinates readout (toggle with F3)
@@ -163,27 +159,20 @@ export class Game {
     });
   }
 
-  private initSettings() {
-    this.settingsPanel = document.getElementById("settings-panel");
-    const slider = document.getElementById(
-      "render-distance",
-    ) as HTMLInputElement | null;
-    const valueLabel = document.getElementById("render-distance-value");
-    if (!slider) return;
+  getRenderRadius(): number {
+    return this.settings.renderRadius;
+  }
 
-    slider.min = String(RENDER_RADIUS_MIN);
-    slider.max = String(RENDER_RADIUS_MAX);
-    slider.value = String(this.settings.renderRadius);
-    if (valueLabel) valueLabel.textContent = String(this.settings.renderRadius);
-
-    slider.addEventListener("input", () => {
-      const radius = parseInt(slider.value, 10);
-      // Mutating the shared settings object updates ChunkManager next tick.
-      this.settings.renderRadius = radius;
-      if (valueLabel) valueLabel.textContent = String(radius);
-      saveRenderRadius(radius);
-      this.renderer.setRenderDistance(radius * CHUNK_SIZE);
-    });
+  /** Update the render distance (chunk radius). Persisted; applied next tick via
+   *  the shared settings object, and the camera far plane/fog immediately. */
+  setRenderRadius(radius: number) {
+    const r = Math.max(
+      RENDER_RADIUS_MIN,
+      Math.min(RENDER_RADIUS_MAX, Math.round(radius)),
+    );
+    this.settings.renderRadius = r;
+    saveRenderRadius(r);
+    this.renderer.setRenderDistance(r * CHUNK_SIZE);
   }
 
   private onWorldgenComplete(response: WorldgenWorkerResponse) {
@@ -265,13 +254,6 @@ export class Game {
     }
     if (this.input.consumeKeyPress("f3")) {
       this.coordsOverlay.toggle();
-      // The coords HUD shares the top-left corner with the render-distance
-      // panel; hide the panel while the HUD is up so they don't overlap.
-      if (this.settingsPanel) {
-        this.settingsPanel.style.display = this.coordsOverlay.visible
-          ? "none"
-          : "";
-      }
     }
   }
   

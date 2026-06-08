@@ -8,7 +8,11 @@
 // Styled via the `.menu-*` classes in index.html so it matches the in-game
 // panels (coordinates HUD, render-distance selector).
 
-import { parseSeed } from "../world/gen/settings";
+import {
+  parseSeed,
+  RENDER_RADIUS_MIN,
+  RENDER_RADIUS_MAX,
+} from "../world/gen/settings";
 
 export interface MenuCallbacks {
   /** Start a new game with the chosen seed. */
@@ -19,6 +23,8 @@ export interface MenuCallbacks {
   onSaveProgress: () => Promise<number> | number;
   /** Toggle automatic saving on every edit. */
   onAutoSaveChange: (enabled: boolean) => void;
+  /** Change the render distance (chunk radius). */
+  onRenderDistanceChange: (radius: number) => void;
 }
 
 export class Menu {
@@ -28,6 +34,8 @@ export class Menu {
   private seedInput: HTMLInputElement;
   private seedDisplay: HTMLSpanElement;
   private autoSaveCheckbox: HTMLInputElement;
+  private renderInput: HTMLInputElement;
+  private renderValue: HTMLSpanElement;
   private status: HTMLDivElement;
 
   constructor(private callbacks: MenuCallbacks) {
@@ -82,6 +90,25 @@ export class Menu {
     const resumeBtn = button("Resume", "menu-btn primary");
     resumeBtn.addEventListener("click", () => this.callbacks.onResume());
 
+    // Render distance.
+    const renderRow = el("div", "menu-row");
+    const renderLabel = el("label");
+    this.renderValue = document.createElement("span");
+    renderLabel.append("Render distance: ");
+    renderLabel.appendChild(this.renderValue);
+    this.renderInput = document.createElement("input");
+    this.renderInput.type = "range";
+    this.renderInput.min = String(RENDER_RADIUS_MIN);
+    this.renderInput.max = String(RENDER_RADIUS_MAX);
+    this.renderInput.step = "1";
+    this.renderInput.addEventListener("input", () => {
+      const r = parseInt(this.renderInput.value, 10);
+      this.renderValue.textContent = String(r);
+      this.callbacks.onRenderDistanceChange(r);
+    });
+    renderRow.appendChild(renderLabel);
+    renderRow.appendChild(this.renderInput);
+
     const saveBtn = button("Save progress", "menu-btn");
     saveBtn.addEventListener("click", async () => {
       this.status.textContent = "Saving…";
@@ -106,6 +133,7 @@ export class Menu {
 
     this.pauseSection.appendChild(seedLine);
     this.pauseSection.appendChild(resumeBtn);
+    this.pauseSection.appendChild(renderRow);
     this.pauseSection.appendChild(saveBtn);
     this.pauseSection.appendChild(autoSaveLabel);
     this.pauseSection.appendChild(this.status);
@@ -125,9 +153,11 @@ export class Menu {
   }
 
   /** Show the pause screen for the running game. */
-  showPause(opts: { seed: number; autoSave: boolean }) {
+  showPause(opts: { seed: number; autoSave: boolean; renderRadius: number }) {
     this.seedDisplay.textContent = String(opts.seed);
     this.autoSaveCheckbox.checked = opts.autoSave;
+    this.renderInput.value = String(opts.renderRadius);
+    this.renderValue.textContent = String(opts.renderRadius);
     this.status.textContent = "";
     this.startSection.style.display = "none";
     this.pauseSection.style.display = "flex";

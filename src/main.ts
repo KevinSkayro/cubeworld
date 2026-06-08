@@ -22,7 +22,11 @@ const menu = new Menu({
       // Escape (pointer-lock release) re-opens the menu in pause mode.
       game.onPause = () => {
         showGameHud(false);
-        menu.showPause({ seed: game!.seed, autoSave: game!.isAutoSave() });
+        menu.showPause({
+          seed: game!.seed,
+          autoSave: game!.isAutoSave(),
+          renderRadius: game!.getRenderRadius(),
+        });
       };
       game.start();
     }
@@ -45,6 +49,10 @@ const menu = new Menu({
 
   onAutoSaveChange(enabled) {
     game?.setAutoSave(enabled);
+  },
+
+  onRenderDistanceChange(radius) {
+    game?.setRenderRadius(radius);
   },
 });
 
