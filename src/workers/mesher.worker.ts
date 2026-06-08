@@ -1,6 +1,7 @@
 import { BlockRegistry } from "../world/BlockRegistry";
 import { Chunk } from "../world/Chunk";
 import { naiveMesh } from "../world/meshing/naiveMesh";
+import { makeNeighborSampler } from "../world/meshing/neighbors";
 import {
   MesherWorkerRequest,
   MesherWorkerResponse,
@@ -9,14 +10,14 @@ import {
 const registry = new BlockRegistry();
 
 self.onmessage = (event: MessageEvent<MesherWorkerRequest>) => {
-  const { chunkKey, chunkSize, blocks } = event.data;
+  const { chunkKey, blocks, neighbors } = event.data;
 
   // Reconstruct chunk from blocks array
   const chunk = new Chunk(0, 0, 0);
   chunk.blocks = blocks;
 
-  // Generate mesh
-  const meshData = naiveMesh(chunk, registry);
+  // Generate mesh, culling chunk-border faces against the neighbour planes.
+  const meshData = naiveMesh(chunk, registry, makeNeighborSampler(neighbors));
 
   // Send back with transferable buffers
   const response: MesherWorkerResponse = {

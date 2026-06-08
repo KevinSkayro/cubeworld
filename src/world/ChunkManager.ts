@@ -3,9 +3,10 @@ import { World } from "./World";
 import { Chunk } from "./Chunk";
 import { CHUNK_SIZE } from "./constants";
 import { loadStoredChunk, saveEditedChunk } from "./persistence/indexedDB";
-import { parseKey } from "./gen/coords";
+import { parseKey, chunkKey as makeChunkKey } from "./gen/coords";
 import { GEN_VERSION, type WorldSettings } from "./gen/settings";
 import { selectChunksToLoad, shouldUnload } from "./chunkLoadOrder";
+import { collectNeighborPlanes } from "./meshing/neighbors";
 
 export class ChunkManager {
   world: World;
@@ -53,7 +54,7 @@ export class ChunkManager {
     // Generated (unedited) chunks are not persisted — they regenerate
     // deterministically, so the DB only holds player edits.
     this.world.chunks.set(chunkKey, chunk);
-    this.requestMesh(chunkKey);
+    this.requestMeshWithNeighbors(chunkKey);
   }
 
   update(playerX: number, playerY: number, playerZ: number) {
@@ -73,8 +74,9 @@ export class ChunkManager {
       this.loadedChunks.add(key);
 
       if (this.world.chunks.has(key)) {
-        // Already generated (e.g. revisited after unload) — just remesh.
-        this.requestMesh(key);
+        // Already generated (e.g. a pinned edited chunk re-entering range) —
+        // remesh it and its neighbours so seams cull correctly.
+        this.requestMeshWithNeighbors(key);
         continue;
       }
 
@@ -100,7 +102,7 @@ export class ChunkManager {
             chunk.blocks = stored.blocks;
             chunk.edited = true;
             this.world.chunks.set(key, chunk);
-            this.requestMesh(key);
+            this.requestMeshWithNeighbors(key);
           } else {
             generate();
           }
@@ -126,12 +128,44 @@ export class ChunkManager {
 
   private requestMesh(chunkKey: string) {
     const chunk = this.world.chunks.get(chunkKey);
-    if (chunk) {
-      this.mesherWorker.postMessage({
-        chunkKey,
-        chunkSize: CHUNK_SIZE,
-        blocks: chunk.blocks,
-      });
+    if (!chunk) return;
+    const [cx, cy, cz] = parseKey(chunkKey);
+    // Hand the mesher each loaded neighbour's border plane so it can cull the
+    // hidden faces along chunk seams.
+    const neighbors = collectNeighborPlanes(
+      (nx, ny, nz) => this.world.chunks.get(makeChunkKey(nx, ny, nz))?.blocks,
+      cx,
+      cy,
+      cz,
+    );
+    this.mesherWorker.postMessage({
+      chunkKey,
+      chunkSize: CHUNK_SIZE,
+      blocks: chunk.blocks,
+      neighbors,
+    });
+  }
+
+  /**
+   * Mesh a chunk and re-mesh its already-displayed neighbours, so the faces
+   * along their shared seams get culled now that this chunk's blocks exist.
+   * Called when a chunk's data first becomes available.
+   */
+  private requestMeshWithNeighbors(chunkKey: string) {
+    this.requestMesh(chunkKey);
+    const [cx, cy, cz] = parseKey(chunkKey);
+    const neighborKeys = [
+      makeChunkKey(cx + 1, cy, cz),
+      makeChunkKey(cx - 1, cy, cz),
+      makeChunkKey(cx, cy + 1, cz),
+      makeChunkKey(cx, cy - 1, cz),
+      makeChunkKey(cx, cy, cz + 1),
+      makeChunkKey(cx, cy, cz - 1),
+    ];
+    for (const nk of neighborKeys) {
+      // Only re-mesh neighbours that are actually on screen; unmeshed ones will
+      // pick up this chunk when they mesh themselves.
+      if (this.chunkMeshes.has(nk)) this.requestMesh(nk);
     }
   }
 

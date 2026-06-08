@@ -109,7 +109,14 @@ const CUBE_FACES = [
   },
 ];
 
-export function naiveMesh(chunk: Chunk, registry: BlockRegistry): MeshData {
+export function naiveMesh(
+  chunk: Chunk,
+  registry: BlockRegistry,
+  // Out-of-bounds neighbour lookup (one of nx/ny/nz is -1 or CHUNK_SIZE). Returns
+  // the adjacent chunk's block, or null when that neighbour is unknown. Omitted
+  // → every chunk-boundary face is rendered (the original behaviour).
+  neighborAt?: (nx: number, ny: number, nz: number) => number | null,
+): MeshData {
   const positions: number[] = [];
   const normals: number[] = [];
   const uvs: number[] = [];
@@ -145,22 +152,21 @@ export function naiveMesh(chunk: Chunk, registry: BlockRegistry): MeshData {
             nz >= 0 &&
             nz < CHUNK_SIZE;
 
-          let shouldCreateFace = false;
-          
-          if (!inBounds) {
-            // At chunk boundary - always create face
-            shouldCreateFace = true;
-          } else {
-            const neighborId = chunk.getBlock(nx, ny, nz);
-            // Render the face unless the neighbour fully occludes it. A
-            // non-opaque neighbour (air or a cutout block like leaves) doesn't
-            // occlude, so a trunk shows through surrounding leaves and leaf
-            // blocks render every face — including leaf-against-leaf — for a
-            // denser-looking canopy.
-            if (!registry.isOpaque(neighborId)) {
-              shouldCreateFace = true;
-            }
-          }
+          // The neighbour across this face: read in-chunk directly, otherwise
+          // ask the cross-chunk lookup (null = unknown neighbour).
+          const neighborId = inBounds
+            ? chunk.getBlock(nx, ny, nz)
+            : neighborAt
+              ? neighborAt(nx, ny, nz)
+              : null;
+
+          // Render the face unless a known, opaque neighbour fully occludes it.
+          // A non-opaque neighbour (air, or a cutout block like leaves) doesn't
+          // occlude — so a trunk shows through surrounding leaves and leaf
+          // blocks render every face. A null neighbour (boundary with no data)
+          // is treated as non-occluding, so the face renders.
+          const shouldCreateFace =
+            neighborId === null || !registry.isOpaque(neighborId);
 
           if (!shouldCreateFace) return;
 
