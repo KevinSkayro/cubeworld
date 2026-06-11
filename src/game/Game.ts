@@ -21,6 +21,9 @@ import {
 } from "../world/gen/settings";
 import { makeNoise, NoiseSampler } from "../world/gen/noise";
 import { columnHeight } from "../world/gen/terrain";
+import { TickEngine } from "../world/sim/TickEngine";
+import { WorldFluid } from "../world/sim/WorldFluid";
+import { updateCell } from "../world/sim/fluid";
 import { BiomeOverlay } from "../debug/BiomeOverlay";
 import { CoordsOverlay } from "../debug/CoordsOverlay";
 
@@ -42,6 +45,10 @@ export class Game {
   biomeNoise: NoiseSampler;
   biomeOverlay: BiomeOverlay;
   coordsOverlay: CoordsOverlay;
+  waterOverlay: HTMLElement | null = null;
+  tickEngine: TickEngine;
+  worldFluid: WorldFluid;
+  private lastFrameTime = 0;
   running: boolean = false;
   paused: boolean = false;
   /** Called when the player releases pointer lock (e.g. Escape) so the host can
@@ -82,6 +89,16 @@ export class Game {
     // Releasing pointer lock (Escape / focus loss) opens the pause menu.
     this.input.onUnlock = () => this.handlePointerUnlock();
     this.world = new World();
+
+    // Fluid simulation: a shared tick engine (2 tps = one tick every 0.5s)
+    // drives water flow. Water cells re-evaluate via the flow rules; settled
+    // water doesn't tick (only disturbances near edits do), so idle lakes cost
+    // nothing.
+    this.tickEngine = new TickEngine(2);
+    this.worldFluid = new WorldFluid(this.world, this.tickEngine);
+    this.tickEngine.onBlockUpdate = (x, y, z) =>
+      updateCell(this.worldFluid, x, y, z);
+
     this.player = new Player(
       this.renderer.camera,
       this.input,
@@ -163,6 +180,9 @@ export class Game {
     this.biomeOverlay = new BiomeOverlay();
     // Debug: coordinates readout (toggle with F3)
     this.coordsOverlay = new CoordsOverlay();
+
+    // Blue tint shown while the camera is submerged.
+    this.waterOverlay = document.getElementById("water-overlay");
 
     // Best-effort flush of pending edited-chunk saves when the tab is hidden or
     // closing, so an edit made moments before leaving still persists.
@@ -398,6 +418,7 @@ export class Game {
           this.world.setBlock(hit.blockX, hit.blockY, hit.blockZ, BLOCK_AIR);
           this.markEditedAt(hit.blockX, hit.blockY, hit.blockZ);
           this.remeshAffectedChunks(hit.blockX, hit.blockY, hit.blockZ);
+          this.worldFluid.disturb(hit.blockX, hit.blockY, hit.blockZ); // water may flow in
         }
         this.mineTargetKey = null;
         this.mineStartTime = 0;
@@ -426,6 +447,7 @@ export class Game {
           this.world.setBlock(placeX, placeY, placeZ, this.selectedBlockType);
           this.markEditedAt(placeX, placeY, placeZ);
           this.remeshAffectedChunks(placeX, placeY, placeZ);
+          this.worldFluid.disturb(placeX, placeY, placeZ); // displaced/blocked water reflows
           this.lastPlaceTime = now;
         }
       }
@@ -459,6 +481,16 @@ export class Game {
     const overlapZ = playerMaxZ > blockMinZ && playerMinZ < blockMaxZ;
     
     return overlapX && overlapY && overlapZ;
+  }
+
+  /** Remesh any chunks whose water the flow sim changed this frame. */
+  private flushFluidChanges() {
+    const dirty = this.worldFluid.dirty;
+    if (dirty.size === 0) return;
+    for (const key of dirty) {
+      if (this.world.chunks.has(key)) this.chunkManager.requestMeshUpdate(key);
+    }
+    dirty.clear();
   }
 
   /** Flag (and persist) the chunk that owns an edited block. */
@@ -497,6 +529,11 @@ export class Game {
   }
 
   gameLoop = () => {
+    const now = performance.now();
+    // Real seconds since last frame, clamped so a tab-out doesn't dump a huge dt.
+    const dt = this.lastFrameTime ? Math.min((now - this.lastFrameTime) / 1000, 0.1) : 0;
+    this.lastFrameTime = now;
+
     // Freeze the simulation while paused (menu open); keep rendering the frame.
     if (!this.paused) {
       this.player.update();
@@ -504,6 +541,9 @@ export class Game {
       this.handleDebugToggles();
       this.handleBlockSelection();
       this.handleBlockInteraction();
+      // Advance water flow, then remesh any chunks it changed.
+      this.tickEngine.advance(dt);
+      this.flushFluidChanges();
       this.chunkManager.update(
         this.player.position.x,
         this.player.position.y,
@@ -520,7 +560,21 @@ export class Game {
         this.player.position.z,
       );
     }
+    this.updateWaterOverlay();
     this.renderer.render();
     requestAnimationFrame(this.gameLoop);
   };
+
+  /** Show a blue tint when the camera (the rendered viewpoint) is in water. */
+  private updateWaterOverlay() {
+    if (!this.waterOverlay) return;
+    const p = this.renderer.camera.position;
+    const submerged =
+      this.world.getBlock(
+        Math.floor(p.x),
+        Math.floor(p.y),
+        Math.floor(p.z),
+      ) === BLOCK_WATER;
+    this.waterOverlay.classList.toggle("active", submerged);
+  }
 }

@@ -85,6 +85,23 @@
         font-size: 12px;
         color: rgba(255, 255, 255, 0.7);
       }
+      /* Blue tint while the camera is submerged in water. Above the HUD, below
+         the menu, click-through. */
+      .water-overlay {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 1500;
+        /* Dark navy-teal: water absorbs light, so being submerged is dimmer and
+           deeper-coloured than the bright surface seen from above. */
+        background: rgba(8, 38, 66, 0.62);
+        opacity: 0;
+        transition: opacity 0.2s ease;
+      }
+      .water-overlay.active {
+        opacity: 1;
+      }
+
       /* In-game HUD is hidden until the player is actually playing. */
       .crosshair,
       .hotbar {
@@ -204,6 +221,7 @@
   <body>
     <div class="crosshair"></div>
     <div class="hotbar" id="hotbar"></div>
+    <div class="water-overlay" id="water-overlay"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

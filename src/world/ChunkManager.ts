@@ -1,7 +1,8 @@
 import * as THREE from "three";
 import { World } from "./World";
 import { Chunk } from "./Chunk";
-import { CHUNK_SIZE } from "./constants";
+import { CHUNK_SIZE, BLOCK_WATER } from "./constants";
+import { SOURCE } from "./sim/fluid";
 import { loadStoredChunk, saveEditedChunk } from "./persistence/indexedDB";
 import { parseKey, chunkKey as makeChunkKey } from "./gen/coords";
 import { GEN_VERSION, type WorldSettings } from "./gen/settings";
@@ -52,6 +53,7 @@ export class ChunkManager {
     const [cx, cy, cz] = chunkKey.split(",").map(Number);
     const chunk = new Chunk(cx, cy, cz);
     chunk.blocks = blocks;
+    initWaterLevels(chunk); // generated water bodies start as full sources
     // Generated (unedited) chunks are not persisted — they regenerate
     // deterministically, so the DB only holds player edits.
     this.world.chunks.set(chunkKey, chunk);
@@ -101,6 +103,8 @@ export class ChunkManager {
           if (stored) {
             const chunk = new Chunk(cx, cy, cz);
             chunk.blocks = stored.blocks;
+            if (stored.waterLevel) chunk.waterLevel = stored.waterLevel;
+            else initWaterLevels(chunk);
             chunk.edited = true;
             this.world.chunks.set(key, chunk);
             this.requestMeshWithNeighbors(key);
@@ -143,6 +147,7 @@ export class ChunkManager {
       chunkKey,
       chunkSize: CHUNK_SIZE,
       blocks: chunk.blocks,
+      waterLevel: chunk.waterLevel,
       neighbors,
     });
   }
@@ -222,6 +227,7 @@ export class ChunkManager {
       this.settings.seed,
       chunkKey,
       chunk.blocks,
+      chunk.waterLevel,
       GEN_VERSION,
     )
       .catch(() => {
@@ -276,5 +282,14 @@ export class ChunkManager {
       this.chunkWaterMeshes.set(chunkKey, mesh);
       this.scene.add(mesh);
     }
+  }
+}
+
+/** Initialise a chunk's water levels from its blocks: generated/loaded water
+ *  bodies start as full source cells (the sim turns edges into flow on demand). */
+function initWaterLevels(chunk: Chunk): void {
+  const { blocks, waterLevel } = chunk;
+  for (let i = 0; i < blocks.length; i++) {
+    waterLevel[i] = blocks[i] === BLOCK_WATER ? SOURCE : 0;
   }
 }

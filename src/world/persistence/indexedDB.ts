@@ -28,6 +28,8 @@ export function storageKey(seed: number, chunkKey: string): string {
 
 export interface StoredChunk {
   blocks: Uint16Array;
+  /** Per-cell water level, if stored. */
+  waterLevel?: Uint8Array;
   /** Generator version the chunk was saved under. */
   version: number;
   /** Always true today (only edited chunks are stored); explicit for clarity
@@ -42,6 +44,7 @@ interface ChunkRecord {
   version: number;
   edited: boolean;
   buffer: ArrayBuffer;
+  waterBuffer?: ArrayBuffer;
 }
 
 // One shared connection, opened lazily.
@@ -82,6 +85,7 @@ export async function saveEditedChunk(
   seed: number,
   chunkKey: string,
   blocks: Uint16Array,
+  waterLevel: Uint8Array,
   version: number,
 ): Promise<void> {
   if (!supportsIndexedDB) return;
@@ -95,6 +99,7 @@ export async function saveEditedChunk(
       version,
       edited: true,
       buffer: blocks.buffer.slice(0),
+      waterBuffer: waterLevel.buffer.slice(0),
     };
     tx.objectStore(STORE_NAME).put(record);
     tx.oncomplete = () => resolve();
@@ -117,6 +122,9 @@ export async function loadStoredChunk(
       if (result && result.buffer) {
         resolve({
           blocks: new Uint16Array(result.buffer),
+          waterLevel: result.waterBuffer
+            ? new Uint8Array(result.waterBuffer)
+            : undefined,
           version: result.version,
           edited: result.edited,
         });

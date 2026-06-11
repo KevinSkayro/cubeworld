@@ -23,6 +23,8 @@ export interface MesherWorkerRequest {
   chunkKey: string;
   chunkSize: number;
   blocks: Uint16Array;
+  /** Per-cell water level (parallel to blocks) for the translucent water pass. */
+  waterLevel: Uint8Array;
   /** Neighbour border planes for cross-chunk face culling (optional). */
   neighbors?: NeighborPlanes;
 }

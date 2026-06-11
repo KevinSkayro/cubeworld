@@ -5,6 +5,9 @@ export class Chunk {
   y: number;
   z: number;
   blocks: Uint16Array;
+  /** Per-cell water level for the fluid sim: 0 = none, 1..7 flowing, 8 source.
+   *  Parallel to `blocks`; non-zero only where the block is water. */
+  waterLevel: Uint8Array;
   /** True once the player has modified this chunk. Edited chunks are persisted
    *  and restored verbatim; unedited chunks are regenerated on demand. */
   edited: boolean = false;
@@ -14,6 +17,7 @@ export class Chunk {
     this.y = y;
     this.z = z;
     this.blocks = new Uint16Array(CHUNK_VOLUME);
+    this.waterLevel = new Uint8Array(CHUNK_VOLUME);
   }
 
   getBlock(lx: number, ly: number, lz: number): number {
