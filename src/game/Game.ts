@@ -24,6 +24,8 @@ import { columnHeight } from "../world/gen/terrain";
 import { TickEngine } from "../world/sim/TickEngine";
 import { WorldFluid } from "../world/sim/WorldFluid";
 import { updateCell } from "../world/sim/fluid";
+import { TimeOfDay } from "../world/TimeOfDay";
+import { Sky } from "../render/Sky";
 import { BiomeOverlay } from "../debug/BiomeOverlay";
 import { CoordsOverlay } from "../debug/CoordsOverlay";
 
@@ -48,6 +50,8 @@ export class Game {
   waterOverlay: HTMLElement | null = null;
   tickEngine: TickEngine;
   worldFluid: WorldFluid;
+  timeOfDay: TimeOfDay;
+  sky: Sky;
   private lastFrameTime = 0;
   running: boolean = false;
   paused: boolean = false;
@@ -85,6 +89,12 @@ export class Game {
 
     this.renderer = new Renderer();
     this.renderer.setRenderDistance(this.settings.renderRadius * CHUNK_SIZE);
+
+    // Day/night cycle: a real-time clock drives the sun, moon, lighting, and
+    // sky colour (1 real minute = 1 in-game hour).
+    this.timeOfDay = new TimeOfDay();
+    this.sky = new Sky(this.renderer.scene);
+
     this.input = new Input(this.renderer.camera, this.renderer.canvas);
     // Releasing pointer lock (Escape / focus loss) opens the pause menu.
     this.input.onUnlock = () => this.handlePointerUnlock();
@@ -544,6 +554,8 @@ export class Game {
       // Advance water flow, then remesh any chunks it changed.
       this.tickEngine.advance(dt);
       this.flushFluidChanges();
+      // Advance the day/night clock and move the sun/moon + lighting with it.
+      this.timeOfDay.advance(dt);
       this.chunkManager.update(
         this.player.position.x,
         this.player.position.y,
@@ -558,8 +570,16 @@ export class Game {
         this.player.position.x,
         this.player.position.y,
         this.player.position.z,
+        this.timeOfDay.label,
       );
     }
+    // Sky follows the camera and current hour every frame (even while paused, so
+    // the menu backdrop matches the time; the clock itself is frozen above).
+    this.sky.update(
+      this.timeOfDay.hours,
+      this.renderer.camera.position,
+      this.renderer.camera.far,
+    );
     this.updateWaterOverlay();
     this.renderer.render();
     requestAnimationFrame(this.gameLoop);

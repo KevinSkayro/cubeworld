@@ -38,7 +38,7 @@ export class CoordsOverlay {
   }
 
   /** Refresh the readout for the player's current world position. */
-  update(x: number, y: number, z: number) {
+  update(x: number, y: number, z: number, time?: string) {
     if (!this.visible) return;
 
     const bx = Math.floor(x);
@@ -56,6 +56,7 @@ export class CoordsOverlay {
     this.container.textContent =
       `XYZ ${x.toFixed(2)} / ${y.toFixed(2)} / ${z.toFixed(2)}\n` +
       `Block ${bx} ${by} ${bz}\n` +
-      `Chunk ${cx} ${cy} ${cz}  (local ${lx} ${ly} ${lz}, size ${CHUNK_SIZE})`;
+      `Chunk ${cx} ${cy} ${cz}  (local ${lx} ${ly} ${lz}, size ${CHUNK_SIZE})` +
+      (time ? `\nTime ${time}` : "");
   }
 }

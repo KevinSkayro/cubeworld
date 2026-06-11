@@ -32,13 +32,7 @@ export class Renderer {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(window.devicePixelRatio);
 
-    // Add lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    this.scene.add(ambientLight);
-
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(10, 20, 10);
-    this.scene.add(directionalLight);
+    //Moved - Lighting and sky colour are owned by render/Sky.ts (the day/night cycle).
 
     window.addEventListener("resize", () => this.onWindowResize());
   }
