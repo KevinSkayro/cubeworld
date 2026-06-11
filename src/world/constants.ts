@@ -16,4 +16,5 @@ export {
   BLOCK_IRON_ORE,
   BLOCK_WOOD,
   BLOCK_LEAVES,
+  BLOCK_BEDROCK,
 } from "./blocks/definitions";

@@ -17,6 +17,7 @@ export const TEX = {
   TREE_SIDE: 9,
   TREE_TOP: 10,
   LEAVES: 11,
+  BEDROCK: 12,
 } as const;
 
 /**

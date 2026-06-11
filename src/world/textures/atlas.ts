@@ -14,6 +14,7 @@ import ironOrePath from "@/assets/blocks/textures/iron_ore.png";
 import treeSidePath from "@/assets/blocks/textures/tree_side.png";
 import treeTopPath from "@/assets/blocks/textures/tree_top.png";
 import leavesPath from "@/assets/blocks/textures/leaves.png";
+import bedrockPath from "@/assets/blocks/textures/bedrock.png";
 
 // Texture paths in order
 const TEXTURE_PATHS = [
@@ -29,6 +30,7 @@ const TEXTURE_PATHS = [
   treeSidePath,    // 9 - tree side
   treeTopPath,     // 10 - tree top
   leavesPath,      // 11 - leaves
+  bedrockPath,     // 12 - bedrock
 ] as const;
 
 const TILE_SIZE = 16; // Each texture is 16x16 pixels

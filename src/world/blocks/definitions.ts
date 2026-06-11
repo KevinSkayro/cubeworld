@@ -82,6 +82,12 @@ export const BLOCK_DEFINITIONS: BlockDef[] = [
     opaque: false, // cutout texture — neighbours render through the gaps
     textureConfig: { type: "uniform", texture: TEX.LEAVES },
   },
+  {
+    id: 10,
+    name: "Bedrock",
+    solid: true,
+    textureConfig: { type: "uniform", texture: TEX.BEDROCK },
+  },
 ];
 
 // Export block constants for convenience
@@ -95,3 +101,4 @@ export const BLOCK_COAL_ORE = 6;
 export const BLOCK_IRON_ORE = 7;
 export const BLOCK_WOOD = 8;
 export const BLOCK_LEAVES = 9;
+export const BLOCK_BEDROCK = 10;

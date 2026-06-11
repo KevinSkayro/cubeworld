@@ -4,7 +4,7 @@ import { Input } from "../input/Input";
 import { Player } from "../player/Player";
 import { World } from "../world/World";
 import { ChunkManager } from "../world/ChunkManager";
-import { CHUNK_SIZE, BLOCK_AIR, BLOCK_STONE, BLOCK_GRASS, BLOCK_DIRT,BLOCK_SAND, BLOCK_SNOW, MAX_BUILD_HEIGHT } from "../world/constants";
+import { CHUNK_SIZE, BLOCK_AIR, BLOCK_STONE, BLOCK_GRASS, BLOCK_DIRT,BLOCK_SAND, BLOCK_SNOW, BLOCK_BEDROCK, MAX_BUILD_HEIGHT } from "../world/constants";
 import { MesherWorkerResponse } from "../world/meshing/types";
 import { voxelRaycast } from "../world/raycast/voxelRaycast";
 import { TextureAtlas } from "../world/textures/atlas";
@@ -362,9 +362,12 @@ export class Game {
       }
       const elapsed = performance.now() - this.mineStartTime;
       if (elapsed >= this.mineHoldMs) {
-        this.world.setBlock(hit.blockX, hit.blockY, hit.blockZ, BLOCK_AIR);
-        this.markEditedAt(hit.blockX, hit.blockY, hit.blockZ);
-        this.remeshAffectedChunks(hit.blockX, hit.blockY, hit.blockZ);
+        // Bedrock is unbreakable — the mine attempt just resets.
+        if (this.world.getBlock(hit.blockX, hit.blockY, hit.blockZ) !== BLOCK_BEDROCK) {
+          this.world.setBlock(hit.blockX, hit.blockY, hit.blockZ, BLOCK_AIR);
+          this.markEditedAt(hit.blockX, hit.blockY, hit.blockZ);
+          this.remeshAffectedChunks(hit.blockX, hit.blockY, hit.blockZ);
+        }
         this.mineTargetKey = null;
         this.mineStartTime = 0;
       }
