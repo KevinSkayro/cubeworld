@@ -1,6 +1,6 @@
 import { BlockRegistry } from "../world/BlockRegistry";
 import { Chunk } from "../world/Chunk";
-import { naiveMesh } from "../world/meshing/naiveMesh";
+import { naiveMesh, waterMesh } from "../world/meshing/naiveMesh";
 import { makeNeighborSampler } from "../world/meshing/neighbors";
 import {
   MesherWorkerRequest,
@@ -17,12 +17,15 @@ self.onmessage = (event: MessageEvent<MesherWorkerRequest>) => {
   chunk.blocks = blocks;
 
   // Generate mesh, culling chunk-border faces against the neighbour planes.
-  const meshData = naiveMesh(chunk, registry, makeNeighborSampler(neighbors));
+  const sampler = makeNeighborSampler(neighbors);
+  const meshData = naiveMesh(chunk, registry, sampler);
+  const waterMeshData = waterMesh(chunk, registry, sampler);
 
   // Send back with transferable buffers
   const response: MesherWorkerResponse = {
     chunkKey,
     meshData,
+    waterMeshData,
   };
 
   const transfers = [
@@ -30,6 +33,10 @@ self.onmessage = (event: MessageEvent<MesherWorkerRequest>) => {
     meshData.normals.buffer,
     meshData.uvs.buffer,
     meshData.indices.buffer,
+    waterMeshData.positions.buffer,
+    waterMeshData.normals.buffer,
+    waterMeshData.uvs.buffer,
+    waterMeshData.indices.buffer,
   ];
 
   self.postMessage(response, transfers);

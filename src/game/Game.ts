@@ -4,7 +4,7 @@ import { Input } from "../input/Input";
 import { Player } from "../player/Player";
 import { World } from "../world/World";
 import { ChunkManager } from "../world/ChunkManager";
-import { CHUNK_SIZE, BLOCK_AIR, BLOCK_STONE, BLOCK_GRASS, BLOCK_DIRT,BLOCK_SAND, BLOCK_SNOW, BLOCK_BEDROCK, MAX_BUILD_HEIGHT } from "../world/constants";
+import { CHUNK_SIZE, BLOCK_AIR, BLOCK_STONE, BLOCK_GRASS, BLOCK_DIRT,BLOCK_SAND, BLOCK_SNOW, BLOCK_BEDROCK, BLOCK_WATER, MAX_BUILD_HEIGHT } from "../world/constants";
 import { MesherWorkerResponse } from "../world/meshing/types";
 import { voxelRaycast } from "../world/raycast/voxelRaycast";
 import { TextureAtlas } from "../world/textures/atlas";
@@ -55,6 +55,7 @@ export class Game {
   thirdPerson: boolean = false;
   textureAtlas: TextureAtlas;
   chunkMaterial: THREE.MeshPhongMaterial;
+  waterMaterial: THREE.MeshPhongMaterial;
   
   // Block selection
   selectedBlockType: number = BLOCK_STONE;
@@ -107,6 +108,17 @@ export class Game {
       // Cut out transparent texels (leaf gaps) instead of showing the atlas
       // background; opaque blocks (alpha 1) are unaffected.
       alphaTest: 0.5,
+    });
+
+    // Translucent water (flat colour, no texture). depthWrite off so it blends
+    // with terrain behind it; DoubleSide so the surface is visible from below
+    // when wading in.
+    this.waterMaterial = new THREE.MeshPhongMaterial({
+      color: 0x3a78c2,
+      transparent: true,
+      opacity: 0.72,
+      depthWrite: false,
+      side: THREE.DoubleSide,
     });
 
     // Create workers
@@ -179,8 +191,10 @@ export class Game {
     this.chunkManager.onWorldgenComplete(response.chunkKey, response.blocks);
   }
 
-  private onMeshReady(response: MesherWorkerResponse) {
-    const { chunkKey, meshData } = response;
+  private buildMesh(
+    meshData: MesherWorkerResponse["meshData"],
+    material: THREE.Material,
+  ): THREE.Mesh {
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute(
       "position",
@@ -192,14 +206,28 @@ export class Game {
     );
     geometry.setAttribute("uv", new THREE.BufferAttribute(meshData.uvs, 2));
     geometry.setIndex(new THREE.BufferAttribute(meshData.indices, 1));
+    return new THREE.Mesh(geometry, material);
+  }
 
-    // Use the shared texture atlas material
-    const mesh = new THREE.Mesh(geometry, this.chunkMaterial);
-
+  private onMeshReady(response: MesherWorkerResponse) {
+    const { chunkKey, meshData, waterMeshData } = response;
     const [cx, cy, cz] = chunkKey.split(",").map(Number);
-    mesh.position.set(cx * CHUNK_SIZE, cy * CHUNK_SIZE, cz * CHUNK_SIZE);
+    const ox = cx * CHUNK_SIZE;
+    const oy = cy * CHUNK_SIZE;
+    const oz = cz * CHUNK_SIZE;
 
+    const mesh = this.buildMesh(meshData, this.chunkMaterial);
+    mesh.position.set(ox, oy, oz);
     this.chunkManager.setMesh(chunkKey, mesh);
+
+    // Build the translucent water mesh only when the chunk has water.
+    if (waterMeshData && waterMeshData.indices.length > 0) {
+      const water = this.buildMesh(waterMeshData, this.waterMaterial);
+      water.position.set(ox, oy, oz);
+      this.chunkManager.setWaterMesh(chunkKey, water);
+    } else {
+      this.chunkManager.setWaterMesh(chunkKey, null);
+    }
   }
 
   start() {
@@ -348,7 +376,10 @@ export class Game {
       origin,
       direction,
       5,
-      (x, y, z) => this.world.getBlock(x, y, z) !== BLOCK_AIR,
+      (x, y, z) => {
+        const b = this.world.getBlock(x, y, z);
+        return b !== BLOCK_AIR && b !== BLOCK_WATER; // water is passable / not targetable
+      },
     );
 
     if (!hit) return;

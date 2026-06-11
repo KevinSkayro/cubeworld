@@ -33,6 +33,20 @@ function unit(n: number): number {
   return (n + 1) * 0.5;
 }
 
+/** Sample just the humidity field (cheaper than the full params). */
+export function sampleHumidity(
+  noise: NoiseSampler,
+  worldX: number,
+  worldZ: number,
+): number {
+  return unit(
+    noise.noise2D(
+      worldX * HUMIDITY_FREQ + HUMIDITY_OFFSET,
+      worldZ * HUMIDITY_FREQ + HUMIDITY_OFFSET,
+    ),
+  );
+}
+
 /** Sample the biome parameters at a world column. Pure and deterministic. */
 export function sampleBiomeParams(
   noise: NoiseSampler,
@@ -41,12 +55,7 @@ export function sampleBiomeParams(
 ): BiomeParams {
   return {
     temperature: unit(noise.noise2D(worldX * TEMP_FREQ, worldZ * TEMP_FREQ)),
-    humidity: unit(
-      noise.noise2D(
-        worldX * HUMIDITY_FREQ + HUMIDITY_OFFSET,
-        worldZ * HUMIDITY_FREQ + HUMIDITY_OFFSET,
-      ),
-    ),
+    humidity: sampleHumidity(noise, worldX, worldZ),
     continentalness: unit(
       noise.noise2D(
         worldX * CONTINENT_FREQ + CONTINENT_OFFSET_X,

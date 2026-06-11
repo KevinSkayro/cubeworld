@@ -123,13 +123,21 @@ describe("decorate", () => {
   // chunk boundaries.
   it("stamps a border-straddling tree's blocks into the correct chunks", () => {
     const c = ctx();
+    const CANOPY_RADIUS = 2; // matches decorations.ts
+    const local = (w: number) => ((w % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
 
-    // Find a tree whose canopy crosses the x=16 boundary (trunk x in 14..17).
+    // Find any tree whose canopy crosses a chunk border in x or z (robust to
+    // terrain changes — no reliance on a specific tree location).
     let tree = null;
-    for (let cellX = 1; cellX <= 6 && !tree; cellX++) {
-      for (let cellZ = 0; cellZ <= 6; cellZ++) {
+    for (let cellX = -8; cellX <= 8 && !tree; cellX++) {
+      for (let cellZ = -8; cellZ <= 8; cellZ++) {
         const t = treeAt(c, cellX, cellZ);
-        if (t && t.x >= 14 && t.x <= 17 && t.z >= 1 && t.z <= 13) {
+        if (!t) continue;
+        const lx = local(t.x);
+        const lz = local(t.z);
+        const crossesX = lx < CANOPY_RADIUS || lx >= CHUNK_SIZE - CANOPY_RADIUS;
+        const crossesZ = lz < CANOPY_RADIUS || lz >= CHUNK_SIZE - CANOPY_RADIUS;
+        if (crossesX || crossesZ) {
           tree = t;
           break;
         }
@@ -141,36 +149,33 @@ describe("decorate", () => {
     const tb: Array<[number, number, number]> = [];
     stampTree(tree!, (wx, wy, wz) => tb.push([wx, wy, wz]));
 
-    // The two chunk columns the tree spans horizontally, across both vertical
-    // layers it can occupy.
+    // Generate (lazily) whichever chunks the tree's blocks fall into.
     const chunks = new Map<string, Uint16Array>();
-    for (const cx of [0, 1]) {
-      for (const cy of [3, 4]) {
-        chunks.set(`${cx},${cy}`, generateChunk(cx, cy, 0, SEED));
+    const blockAt = (wx: number, wy: number, wz: number) => {
+      const cx = Math.floor(wx / CHUNK_SIZE);
+      const cy = Math.floor(wy / CHUNK_SIZE);
+      const cz = Math.floor(wz / CHUNK_SIZE);
+      const key = `${cx},${cy},${cz}`;
+      let buf = chunks.get(key);
+      if (!buf) {
+        buf = generateChunk(cx, cy, cz, SEED);
+        chunks.set(key, buf);
       }
-    }
+      return buf[
+        localIndex(wx - cx * CHUNK_SIZE, wy - cy * CHUNK_SIZE, wz - cz * CHUNK_SIZE)
+      ];
+    };
 
-    let left = 0;
-    let right = 0;
+    // Every above-surface block must be present (wood/leaves) in its chunk, and
+    // the tree must genuinely span more than one chunk column.
+    const columns = new Set<string>();
     for (const [wx, wy, wz] of tb) {
-      if (wz < 0 || wz >= CHUNK_SIZE) continue; // outside our z chunk
-      if (wx < 0 || wx >= CHUNK_SIZE * 2) continue;
-      if (wy < 48 || wy >= 80) continue;
-      // Canopy blocks that fall inside neighbouring terrain are legitimately
+      // Canopy cells that land inside neighbouring terrain are legitimately
       // skipped (place only fills air) — only assert ones above their surface.
       if (wy <= columnHeight(c.noise, wx, wz)) continue;
-
-      const cx = wx >= CHUNK_SIZE ? 1 : 0;
-      const cy = Math.floor(wy / CHUNK_SIZE);
-      const buf = chunks.get(`${cx},${cy}`)!;
-      const block = buf[localIndex(wx - cx * CHUNK_SIZE, wy - cy * CHUNK_SIZE, wz)];
-      expect([BLOCK_WOOD, BLOCK_LEAVES]).toContain(block);
-      if (cx === 0) left++;
-      else right++;
+      expect([BLOCK_WOOD, BLOCK_LEAVES]).toContain(blockAt(wx, wy, wz));
+      columns.add(`${Math.floor(wx / CHUNK_SIZE)},${Math.floor(wz / CHUNK_SIZE)}`);
     }
-
-    // It genuinely straddles: blocks present on both sides of the x border.
-    expect(left).toBeGreaterThan(0);
-    expect(right).toBeGreaterThan(0);
+    expect(columns.size).toBeGreaterThan(1);
   });
 });

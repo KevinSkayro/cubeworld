@@ -80,4 +80,6 @@ export const FIELD = {
   TERRAIN: { frequency: 0.03, octaves: 1, lacunarity: 2, gain: 0.5 },
   /** Exposed-stone patch placement. */
   STONE_PATCH: { frequency: 0.04, octaves: 1, lacunarity: 2, gain: 0.5 },
+  /** Low-frequency lake-basin placement (large, sparse depressions). */
+  LAKE: { frequency: 0.012, octaves: 2, lacunarity: 2, gain: 0.5 },
 } as const satisfies Record<string, FbmConfig>;

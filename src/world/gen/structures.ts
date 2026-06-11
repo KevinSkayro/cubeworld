@@ -28,7 +28,7 @@ import {
   BLOCK_SNOW,
 } from "../constants";
 import { localIndex } from "./coords";
-import { columnHeight, BASE_HEIGHT } from "./terrain";
+import { columnHeight, BASE_HEIGHT, WATER_LEVEL } from "./terrain";
 import { rand01, randInt } from "./random";
 import { caveSurfaceMargin, isCaveVoxel } from "./caves";
 import { sampleBiomeParams } from "../biome/params";
@@ -160,6 +160,7 @@ export function structureAt(
 
   const height = columnHeight(noise, x, z);
   if (height > MAX_GROUND_HEIGHT) return null; // gentle ground only
+  if (height < WATER_LEVEL) return null; // not in (flooded) lake basins
 
   // Real ground beneath (not exposed mountain stone or desert sand), and not
   // over a cave mouth — so the structure never floats.

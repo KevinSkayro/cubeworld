@@ -12,6 +12,7 @@ export class ChunkManager {
   world: World;
   loadedChunks: Set<string> = new Set();
   chunkMeshes: Map<string, THREE.Mesh> = new Map();
+  chunkWaterMeshes: Map<string, THREE.Mesh> = new Map();
   settings: WorldSettings;
   scene: THREE.Scene;
   mesherWorker: Worker;
@@ -180,6 +181,13 @@ export class ChunkManager {
       this.chunkMeshes.delete(chunkKey);
     }
 
+    const waterMesh = this.chunkWaterMeshes.get(chunkKey);
+    if (waterMesh) {
+      waterMesh.geometry.dispose();
+      this.scene.remove(waterMesh);
+      this.chunkWaterMeshes.delete(chunkKey);
+    }
+
     // Evict the block data too, bounding memory to the loaded region — except
     // chunks with unsaved edits, which are kept resident so they can't be lost.
     // Everything else is safe to drop: unedited chunks regenerate
@@ -254,5 +262,19 @@ export class ChunkManager {
     }
     this.chunkMeshes.set(chunkKey, mesh);
     this.scene.add(mesh);
+  }
+
+  /** Set (or clear, with null) the translucent water mesh for a chunk. */
+  setWaterMesh(chunkKey: string, mesh: THREE.Mesh | null) {
+    const old = this.chunkWaterMeshes.get(chunkKey);
+    if (old) {
+      old.geometry.dispose();
+      this.scene.remove(old);
+      this.chunkWaterMeshes.delete(chunkKey);
+    }
+    if (mesh) {
+      this.chunkWaterMeshes.set(chunkKey, mesh);
+      this.scene.add(mesh);
+    }
   }
 }

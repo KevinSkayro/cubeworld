@@ -30,4 +30,6 @@ export interface MesherWorkerRequest {
 export interface MesherWorkerResponse {
   chunkKey: string;
   meshData: MeshData;
+  /** Translucent (water) geometry for the blended render pass. */
+  waterMeshData: MeshData;
 }

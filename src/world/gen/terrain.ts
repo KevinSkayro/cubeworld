@@ -17,6 +17,7 @@ import { FIELD } from "./noise";
 import type { NoiseSampler } from "./noise";
 import { rand01, randInt } from "./random";
 import { localIndex } from "./coords";
+import { sampleHumidity } from "../biome/params";
 import type { GenContext } from "./types";
 
 // Each independent random decision draws from its own hash stream (distinct
@@ -31,6 +32,25 @@ const SALT_BLOCK_STONE = 5;
 // there is a deep underground for caves and an ore depth gradient. Exported so
 // caves/ores can reason about depth.
 export const BASE_HEIGHT = 60;
+
+// Sea level for lakes. Set just below the flat-terrain minimum so only
+// lake-depressed basins dip below it (flat land stays dry); the water stage
+// fills air up to this level in humid basins. See gen/water.ts.
+export const WATER_LEVEL = BASE_HEIGHT - 2;
+
+// Lake basins: a sparse, low-frequency field carves shallow bowls into the flat
+// lowlands (never mountains), which the water stage then floods where it's
+// humid. Offsets decorrelate the lake field from the region/terrain fields.
+const LAKE_OFFSET_X = 4200;
+const LAKE_OFFSET_Z = -1700;
+const LAKE_THRESHOLD = 0.62; // only the high tail of the field becomes lakes
+const LAKE_FULL = 0.82; // full depth at/above this
+const MAX_LAKE_DEPTH = 7; // deepest a basin floor sits below the flat surface
+const LAKE_MAX_MOUNTAIN = 0.15; // no lakes once terrain starts rising
+// Basins only form in humid climates, so deserts stay dry. Ramped (not a hard
+// cut) so basin depth fades to nothing at the humidity edge — no sudden walls.
+const LAKE_HUMID_MIN = 0.45;
+const LAKE_HUMID_FULL = 0.6;
 
 // Terrain ruggedness. Most of the world is gentle (FLAT_AMPLITUDE); rugged
 // mountains only ramp in where the low-frequency region noise is high, gated by
@@ -51,6 +71,29 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
   return t * t * (3 - 2 * t);
 }
 
+/** How many blocks to depress a column for a lake basin (0 = no lake). Only the
+ *  flat lowlands (low mountainFactor) and the high tail of the lake field carve
+ *  basins, so lakes are sparse and never on hills/mountains. */
+function lakeDepth(
+  noise: NoiseSampler,
+  worldX: number,
+  worldZ: number,
+  mountainFactor: number,
+): number {
+  if (mountainFactor > LAKE_MAX_MOUNTAIN) return 0;
+  const lake =
+    (noise.fbm2D(worldX + LAKE_OFFSET_X, worldZ + LAKE_OFFSET_Z, FIELD.LAKE) + 1) *
+    0.5;
+  if (lake < LAKE_THRESHOLD) return 0;
+  // Humid basins only (sampled here, after the cheap lake-field reject).
+  const humidity = sampleHumidity(noise, worldX, worldZ);
+  if (humidity < LAKE_HUMID_MIN) return 0;
+  const t =
+    smoothstep(LAKE_THRESHOLD, LAKE_FULL, lake) *
+    smoothstep(LAKE_HUMID_MIN, LAKE_HUMID_FULL, humidity);
+  return Math.round(t * MAX_LAKE_DEPTH);
+}
+
 /**
  * Terrain surface height for a world column. Single source of truth shared by
  * the terrain stage and the surface pass. The region noise selects ruggedness:
@@ -67,7 +110,9 @@ export function columnHeight(
   const amplitude =
     FLAT_AMPLITUDE + mountainFactor * (MOUNTAIN_AMPLITUDE - FLAT_AMPLITUDE);
   const noiseValue = noise.fbm2D(worldX, worldZ, FIELD.TERRAIN);
-  return Math.floor(BASE_HEIGHT + noiseValue * amplitude);
+  const base = Math.floor(BASE_HEIGHT + noiseValue * amplitude);
+  // Carve lake basins into the lowlands (flooded later by the water stage).
+  return base - lakeDepth(noise, worldX, worldZ, mountainFactor);
 }
 
 export function generateTerrainShape(

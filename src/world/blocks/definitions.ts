@@ -16,6 +16,9 @@ export interface BlockDef {
   /** Whether the block fully occludes neighbours. Default true; set false for
    *  cutout blocks (e.g. leaves) so adjacent faces still render through them. */
   opaque?: boolean;
+  /** Translucent blocks (e.g. water) are meshed in a separate blended pass
+   *  rather than the opaque atlas pass. */
+  translucent?: boolean;
 }
 
 // Block definitions - single source of truth
@@ -88,6 +91,18 @@ export const BLOCK_DEFINITIONS: BlockDef[] = [
     solid: true,
     textureConfig: { type: "uniform", texture: TEX.BEDROCK },
   },
+  {
+    id: 11,
+    name: "Water",
+    // Not "solid": the opaque atlas mesher skips it, and it's passable (the
+    // player/raycast treat it as non-collidable). Rendered translucent in a
+    // separate blended pass with a flat colour, so its texture is unused
+    // (placeholder kept only to satisfy the config type).
+    solid: false,
+    opaque: false,
+    translucent: true,
+    textureConfig: { type: "uniform", texture: TEX.STONE },
+  },
 ];
 
 // Export block constants for convenience
@@ -102,3 +117,4 @@ export const BLOCK_IRON_ORE = 7;
 export const BLOCK_WOOD = 8;
 export const BLOCK_LEAVES = 9;
 export const BLOCK_BEDROCK = 10;
+export const BLOCK_WATER = 11;

@@ -17,4 +17,5 @@ export {
   BLOCK_WOOD,
   BLOCK_LEAVES,
   BLOCK_BEDROCK,
+  BLOCK_WATER,
 } from "./blocks/definitions";

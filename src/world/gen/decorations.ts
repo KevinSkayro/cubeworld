@@ -20,7 +20,7 @@ import {
   BLOCK_SNOW,
 } from "../constants";
 import { localIndex } from "./coords";
-import { columnHeight, BASE_HEIGHT } from "./terrain";
+import { columnHeight, BASE_HEIGHT, WATER_LEVEL } from "./terrain";
 import { rand01, randInt } from "./random";
 import { caveSurfaceMargin, isCaveVoxel } from "./caves";
 import { sampleBiomeParams } from "../biome/params";
@@ -58,6 +58,7 @@ export function treeAt(ctx: GenContext, cellX: number, cellZ: number): Tree | nu
 
   const height = columnHeight(noise, x, z);
   if (height > TREE_MAX_HEIGHT) return null; // not on mountains
+  if (height < WATER_LEVEL) return null; // not in (flooded) lake basins
 
   const biome = selectBiome(sampleBiomeParams(noise, x, z));
   if (biome.treeDensity <= 0) return null; // e.g. desert

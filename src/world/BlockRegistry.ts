@@ -15,6 +15,7 @@ export interface BlockDefinition {
   name: string;
   solid: boolean;
   opaque: boolean;
+  translucent: boolean;
   textures: BlockFaceTextures;
 }
 
@@ -54,6 +55,7 @@ export class BlockRegistry {
         name: def.name,
         solid: def.solid,
         opaque: def.opaque !== false, // default true
+        translucent: def.translucent === true, // default false
         textures,
       });
     }
@@ -72,6 +74,12 @@ export class BlockRegistry {
   isOpaque(id: number): boolean {
     const block = this.blocks.get(id);
     return block ? block.solid && block.opaque : false;
+  }
+
+  /** Whether the block is rendered in the translucent pass (e.g. water). */
+  isTranslucent(id: number): boolean {
+    const block = this.blocks.get(id);
+    return block ? block.translucent : false;
   }
 
   getTextures(id: number): BlockFaceTextures | undefined {

@@ -204,3 +204,82 @@ export function naiveMesh(
     indices: new Uint32Array(indices),
   };
 }
+
+/**
+ * Mesh the translucent blocks (water) of a chunk into a separate buffer for the
+ * blended render pass. A water face is rendered toward air (or an unknown
+ * neighbour) and culled toward another water block (internal) or an opaque block
+ * (hidden). UVs are zero — the water material is a flat colour with no texture.
+ */
+export function waterMesh(
+  chunk: Chunk,
+  registry: BlockRegistry,
+  neighborAt?: (nx: number, ny: number, nz: number) => number | null,
+): MeshData {
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+
+  let vertexCount = 0;
+
+  for (let y = 0; y < CHUNK_SIZE; y++) {
+    for (let z = 0; z < CHUNK_SIZE; z++) {
+      for (let x = 0; x < CHUNK_SIZE; x++) {
+        const blockId = chunk.getBlock(x, y, z);
+        if (!registry.isTranslucent(blockId)) continue;
+
+        const neighbors = [
+          { nx: x + 1, ny: y, nz: z },
+          { nx: x - 1, ny: y, nz: z },
+          { nx: x, ny: y + 1, nz: z },
+          { nx: x, ny: y - 1, nz: z },
+          { nx: x, ny: y, nz: z + 1 },
+          { nx: x, ny: y, nz: z - 1 },
+        ];
+
+        CUBE_FACES.forEach((face, faceIdx) => {
+          const { nx, ny, nz } = neighbors[faceIdx];
+          const inBounds =
+            nx >= 0 &&
+            nx < CHUNK_SIZE &&
+            ny >= 0 &&
+            ny < CHUNK_SIZE &&
+            nz >= 0 &&
+            nz < CHUNK_SIZE;
+
+          const neighborId = inBounds
+            ? chunk.getBlock(nx, ny, nz)
+            : neighborAt
+              ? neighborAt(nx, ny, nz)
+              : null;
+
+          // Cull internal water↔water faces and faces hidden behind opaque
+          // blocks; render the rest (the water surface and edges against air).
+          const cull =
+            neighborId === blockId ||
+            (neighborId !== null && registry.isOpaque(neighborId));
+          if (cull) return;
+
+          const [normX, normY, normZ] = face.normal;
+          for (let i = 0; i < face.vertices.length; i++) {
+            const [vx, vy, vz] = face.vertices[i];
+            positions.push(x + vx, y + vy, z + vz);
+            normals.push(normX, normY, normZ);
+            uvs.push(0, 0);
+          }
+          indices.push(vertexCount, vertexCount + 2, vertexCount + 1);
+          indices.push(vertexCount, vertexCount + 3, vertexCount + 2);
+          vertexCount += 4;
+        });
+      }
+    }
+  }
+
+  return {
+    positions: new Float32Array(positions),
+    normals: new Float32Array(normals),
+    uvs: new Float32Array(uvs),
+    indices: new Uint32Array(indices),
+  };
+}

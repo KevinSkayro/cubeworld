@@ -13,6 +13,7 @@ import { applySurfacePass } from "./surface";
 import { placeOres } from "./ores";
 import { carveCaves } from "./caves";
 import { applyBedrock } from "./bedrock";
+import { applyWater } from "./water";
 import { decorate } from "./decorations";
 import { placeStructures } from "./structures";
 
@@ -33,6 +34,7 @@ export class ChunkGenerator {
       placeOres,
       carveCaves,
       applyBedrock,
+      applyWater,
       decorate,
       placeStructures,
     ];

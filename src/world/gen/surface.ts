@@ -9,7 +9,7 @@
 
 import { CHUNK_SIZE, BLOCK_GRASS, BLOCK_DIRT } from "../constants";
 import { localIndex } from "./coords";
-import { columnHeight } from "./terrain";
+import { columnHeight, WATER_LEVEL } from "./terrain";
 import { sampleBiomeParams } from "../biome/params";
 import { selectBiome } from "../biome/biomeTable";
 import type { GenContext } from "./types";
@@ -40,6 +40,9 @@ export function applySurfacePass(
       if (height < chunkMinY || height - SURFACE_DEPTH > chunkMaxY) continue;
 
       const biome = selectBiome(sampleBiomeParams(noise, worldX, worldZ));
+      // Submerged lake floors read as dirt, not grass/snow, under the water.
+      const underwater = height < WATER_LEVEL;
+      const surfaceBlock = underwater ? BLOCK_DIRT : biome.surfaceBlock;
 
       for (let ly = 0; ly < CHUNK_SIZE; ly++) {
         const worldY = chunkMinY + ly;
@@ -50,7 +53,7 @@ export function applySurfacePass(
 
         if (worldY === height) {
           // Surface block — leave stone (mountains/exposed patches) untouched.
-          if (block === BLOCK_GRASS) blocks[index] = biome.surfaceBlock;
+          if (block === BLOCK_GRASS) blocks[index] = surfaceBlock;
         } else if (block === BLOCK_DIRT) {
           // Subsurface filler.
           blocks[index] = biome.fillerBlock;

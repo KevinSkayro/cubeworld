@@ -15,7 +15,7 @@
 
 import { CHUNK_SIZE, BLOCK_AIR } from "../constants";
 import { localIndex } from "./coords";
-import { columnHeight } from "./terrain";
+import { columnHeight, WATER_LEVEL } from "./terrain";
 import type { GenContext } from "./types";
 import type { NoiseSampler } from "./noise";
 
@@ -143,6 +143,16 @@ export function carveCaves(
       // Skip columns whose carve zone is below the floor or above this chunk.
       if (caveTop < CAVE_FLOOR || caveTop < chunkMinY) continue;
 
+      // Near sea level, a cave could open into the side of surface water and
+      // leave water touching air. Only there do we look at neighbour surfaces so
+      // we can keep a solid wall between caves and water. (Terrain is smooth, so
+      // a column well above sea level can't border a flooded one.)
+      const checkWater = height <= WATER_LEVEL + 2;
+      const hxp = checkWater ? columnHeight(noise, worldX + 1, worldZ) : 0;
+      const hxn = checkWater ? columnHeight(noise, worldX - 1, worldZ) : 0;
+      const hzp = checkWater ? columnHeight(noise, worldX, worldZ + 1) : 0;
+      const hzn = checkWater ? columnHeight(noise, worldX, worldZ - 1) : 0;
+
       for (let ly = 0; ly < CHUNK_SIZE; ly++) {
         const worldY = chunkMinY + ly;
         if (worldY > caveTop || worldY < CAVE_FLOOR) continue;
@@ -150,9 +160,24 @@ export function carveCaves(
         const index = localIndex(lx, ly, lz);
         if (blocks[index] === BLOCK_AIR) continue;
 
-        if (isCaveVoxel(noise, worldX, worldY, worldZ, height, margin)) {
-          blocks[index] = BLOCK_AIR;
+        if (!isCaveVoxel(noise, worldX, worldY, worldZ, height, margin)) continue;
+
+        // Don't carve where water would sit in this cell or an adjacent one (a
+        // neighbour column whose surface is below y is flooded at y; height <= y
+        // catches a surface-breaching entrance directly under the water).
+        if (
+          checkWater &&
+          worldY <= WATER_LEVEL &&
+          (height <= worldY ||
+            hxp < worldY ||
+            hxn < worldY ||
+            hzp < worldY ||
+            hzn < worldY)
+        ) {
+          continue;
         }
+
+        blocks[index] = BLOCK_AIR;
       }
     }
   }

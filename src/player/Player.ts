@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { Input } from "../input/Input";
-import { BLOCK_AIR, BLOCK_GRASS, BLOCK_STONE } from "../world/constants";
+import { BLOCK_AIR, BLOCK_GRASS, BLOCK_STONE, BLOCK_WATER } from "../world/constants";
 import { TextureLoader, SRGBColorSpace } from "three";
 import grassFootstepSound from "@/assets/player/audio/footstep_grass_004.ogg";
 import stoneFootstepSound from "@/assets/player/audio/footstep_stone_002.ogg";
@@ -491,6 +491,13 @@ export class Player {
     this.model.visible = this.thirdPerson;
   }
 
+  /** Whether a block blocks movement. Air and water are passable (water so the
+   *  player can wade/swim into it). */
+  private isSolidAt(x: number, y: number, z: number): boolean {
+    const b = this.checkBlock(x, y, z);
+    return b !== BLOCK_AIR && b !== BLOCK_WATER;
+  }
+
   private resolveCollisionX() {
     const feet = this.position.y - this.height;
     const head = this.position.y;
@@ -506,10 +513,10 @@ export class Player {
         z <= Math.floor(this.position.z + this.radius - EPS);
         z++
       ) {
-        if (this.checkBlock(xMinIdx, y, z) !== BLOCK_AIR) {
+        if (this.isSolidAt(xMinIdx, y, z)) {
           this.position.x = xMinIdx + 1 + this.radius;
         }
-        if (this.checkBlock(xMaxIdx, y, z) !== BLOCK_AIR) {
+        if (this.isSolidAt(xMaxIdx, y, z)) {
           this.position.x = xMaxIdx - this.radius - EPS;
         }
       }
@@ -531,10 +538,10 @@ export class Player {
         x <= Math.floor(this.position.x + this.radius - EPS);
         x++
       ) {
-        if (this.checkBlock(x, y, zMinIdx) !== BLOCK_AIR) {
+        if (this.isSolidAt(x, y, zMinIdx)) {
           this.position.z = zMinIdx + 1 + this.radius;
         }
-        if (this.checkBlock(x, y, zMaxIdx) !== BLOCK_AIR) {
+        if (this.isSolidAt(x, y, zMaxIdx)) {
           this.position.z = zMaxIdx - this.radius - EPS;
         }
       }
@@ -560,7 +567,7 @@ export class Player {
         // Check feet (going down)
         if (this.velocity.y <= 0) {
           const feetBlock = Math.floor(feet - EPS);
-          if (this.checkBlock(x, feetBlock, z) !== BLOCK_AIR) {
+          if (this.isSolidAt(x, feetBlock, z)) {
             this.position.y = feetBlock + 1 + this.height;
             this.velocity.y = 0;
             this.onGround = true;
@@ -570,7 +577,7 @@ export class Player {
         // Check head (going up)
         if (this.velocity.y > 0) {
           const headBlock = Math.floor(head + EPS);
-          if (this.checkBlock(x, headBlock, z) !== BLOCK_AIR) {
+          if (this.isSolidAt(x, headBlock, z)) {
             this.position.y = headBlock - EPS;
             this.velocity.y = 0;
           }
